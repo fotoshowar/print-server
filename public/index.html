@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>🖨️ Imprimir Fotos</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f0f2f5; color: #333; }
+
+    header {
+      background: #2563eb;
+      color: white;
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    header h1 { font-size: 1.2rem; }
+
+    .container { max-width: 600px; margin: 0 auto; padding: 16px; }
+
+    /* Upload Zone */
+    .upload-zone {
+      background: white;
+      border: 2px dashed #2563eb;
+      border-radius: 16px;
+      padding: 32px 16px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+      margin-bottom: 16px;
+    }
+    .upload-zone:hover, .upload-zone.drag-over {
+      background: #eff6ff;
+      border-color: #1d4ed8;
+    }
+    .upload-zone .icon { font-size: 3rem; margin-bottom: 8px; }
+    .upload-zone p { color: #6b7280; font-size: 0.9rem; }
+    .upload-zone input[type="file"] { display: none; }
+    .upload-btn {
+      display: inline-block;
+      background: #2563eb;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      padding: 12px 28px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 12px;
+      transition: background 0.2s;
+    }
+    .upload-btn:hover { background: #1d4ed8; }
+
+    /* Progress */
+    .upload-progress {
+      display: none;
+      background: white;
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+    .progress-bar {
+      height: 8px;
+      background: #e5e7eb;
+      border-radius: 4px;
+      overflow: hidden;
+      margin-top: 8px;
+    }
+    .progress-fill {
+      height: 100%;
+      background: #2563eb;
+      border-radius: 4px;
+      transition: width 0.3s;
+      width: 0%;
+    }
+
+    /* Galeria */
+    .section-title {
+      font-size: 1rem;
+      font-weight: 700;
+      color: #374151;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .photo-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .photo-card {
+      background: white;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .photo-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+
+    .photo-card img {
+      width: 100%;
+      height: 160px;
+      object-fit: cover;
+      display: block;
+      cursor: pointer;
+    }
+
+    .photo-card .actions {
+      padding: 10px;
+      display: flex;
+      gap: 6px;
+    }
+
+    .btn {
+      flex: 1;
+      padding: 8px 4px;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-a4 { background: #2563eb; color: white; }
+    .btn-a4:hover { background: #1d4ed8; }
+    .btn-10x15 { background: #7c3aed; color: white; }
+    .btn-10x15:hover { background: #6d28d9; }
+    .btn-delete { background: #fee2e2; color: #dc2626; flex: 0; padding: 8px 10px; }
+    .btn-delete:hover { background: #fecaca; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* Modal imagen grande */
+    .modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.9);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .modal.open { display: flex; }
+    .modal img { max-width: 100%; max-height: 80vh; border-radius: 8px; object-fit: contain; }
+    .modal-close {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      background: white;
+      border: none;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      font-size: 1.2rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* Toast */
+    .toast {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%) translateY(100px);
+      background: #1f2937;
+      color: white;
+      padding: 12px 20px;
+      border-radius: 10px;
+      font-size: 0.9rem;
+      transition: transform 0.3s;
+      z-index: 2000;
+      max-width: 300px;
+      text-align: center;
+    }
+    .toast.show { transform: translateX(-50%) translateY(0); }
+    .toast.success { background: #059669; }
+    .toast.error { background: #dc2626; }
+
+    .empty-state {
+      text-align: center;
+      padding: 40px 16px;
+      color: #9ca3af;
+    }
+    .empty-state .icon { font-size: 3rem; margin-bottom: 8px; }
+
+    .spinner {
+      display: inline-block;
+      width: 14px;
+      height: 14px;
+      border: 2px solid rgba(255,255,255,0.4);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+
+<header>
+  <span>🖨️</span>
+  <h1>Imprimir Fotos</h1>
+</header>
+
+<div class="container">
+
+  <!-- Upload Zone -->
+  <div class="upload-zone" id="uploadZone">
+    <div class="icon">📸</div>
+    <p>Toca para seleccionar fotos</p>
+    <p style="font-size:0.8rem;margin-top:4px;">JPG, PNG — máx 20MB</p>
+    <input type="file" id="fileInput" accept="image/*" multiple>
+    <button class="upload-btn" onclick="document.getElementById('fileInput').click()">
+      Seleccionar Fotos
+    </button>
+  </div>
+
+  <!-- Progreso -->
+  <div class="upload-progress" id="uploadProgress">
+    <p id="progressText">Subiendo foto...</p>
+    <div class="progress-bar">
+      <div class="progress-fill" id="progressFill"></div>
+    </div>
+  </div>
+
+  <!-- Galeria -->
+  <div class="section-title">🖼️ Fotos Cargadas</div>
+  <div class="photo-grid" id="photoGrid">
+    <div class="empty-state" style="grid-column:1/-1">
+      <div class="icon">📂</div>
+      <p>No hay fotos aún.<br>Sube una para empezar.</p>
+    </div>
+  </div>
+
+</div>
+
+<!-- Modal -->
+<div class="modal" id="modal" onclick="closeModal()">
+  <button class="modal-close">✕</button>
+  <img id="modalImg" src="" alt="">
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+  let photos = [];
+
+  // ======== Upload ========
+  const fileInput = document.getElementById('fileInput');
+  const uploadZone = document.getElementById('uploadZone');
+
+  fileInput.addEventListener('change', (e) => {
+    const files = Array.from(e.target.files);
+    files.forEach(uploadPhoto);
+    fileInput.value = '';
+  });
+
+  // Drag & Drop
+  uploadZone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    uploadZone.classList.add('drag-over');
+  });
+  uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('drag-over'));
+  uploadZone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    uploadZone.classList.remove('drag-over');
+    const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
+    files.forEach(uploadPhoto);
+  });
+
+  async function uploadPhoto(file) {
+    const progressEl = document.getElementById('uploadProgress');
+    const progressFill = document.getElementById('progressFill');
+    const progressText = document.getElementById('progressText');
+
+    progressEl.style.display = 'block';
+    progressText.textContent = `Subiendo ${file.name}...`;
+    progressFill.style.width = '0%';
+
+    const formData = new FormData();
+    formData.append('photo', file);
+
+    try {
+      // Simular progreso
+      let progress = 0;
+      const interval = setInterval(() => {
+        progress = Math.min(progress + 20, 90);
+        progressFill.style.width = progress + '%';
+      }, 100);
+
+      const res = await fetch('/api/upload', { method: 'POST', body: formData });
+      clearInterval(interval);
+      progressFill.style.width = '100%';
+
+      if (!res.ok) throw new Error('Error al subir');
+
+      const data = await res.json();
+      showToast('✅ Foto subida!', 'success');
+
+      setTimeout(() => {
+        progressEl.style.display = 'none';
+        loadPhotos();
+      }, 500);
+
+    } catch (err) {
+      progressEl.style.display = 'none';
+      showToast('❌ Error al subir la foto', 'error');
+    }
+  }
+
+  // ======== Cargar fotos ========
+  async function loadPhotos() {
+    try {
+      const res = await fetch('/api/photos');
+      photos = await res.json();
+      renderPhotos();
+    } catch (err) {
+      console.error('Error cargando fotos:', err);
+    }
+  }
+
+  function renderPhotos() {
+    const grid = document.getElementById('photoGrid');
+
+    if (photos.length === 0) {
+      grid.innerHTML = `
+        <div class="empty-state" style="grid-column:1/-1">
+          <div class="icon">📂</div>
+          <p>No hay fotos aún.<br>Sube una para empezar.</p>
+        </div>`;
+      return;
+    }
+
+    grid.innerHTML = photos.map(photo => `
+      <div class="photo-card" id="card-${photo.filename}">
+        <img src="${photo.path}?t=${Date.now()}" alt="Foto"
+             onclick="openModal('${photo.path}')">
+        <div class="actions">
+          <button class="btn btn-a4" onclick="printPhoto('${photo.filename}', 'A4', this)">
+            🖨️ A4
+          </button>
+          <button class="btn btn-10x15" onclick="printPhoto('${photo.filename}', '10x15', this)">
+            📷 10×15
+          </button>
+          <button class="btn btn-delete" onclick="deletePhoto('${photo.filename}')">
+            🗑️
+          </button>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  // ======== Imprimir ========
+  async function printPhoto(filename, size, btn) {
+    const originalText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>';
+
+    try {
+      const res = await fetch('/api/print', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename, size, printer: 'EPSON L805 Series' })
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        showToast(`✅ Enviado a imprimir en ${size}!`, 'success');
+      } else {
+        showToast('❌ Error al imprimir', 'error');
+      }
+    } catch (err) {
+      showToast('❌ Error de conexión', 'error');
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = originalText;
+    }
+  }
+
+  // ======== Eliminar ========
+  async function deletePhoto(filename) {
+    if (!confirm('¿Eliminar esta foto?')) return;
+
+    try {
+      const res = await fetch(`/api/photos/${filename}`, { method: 'DELETE' });
+      if (res.ok) {
+        showToast('🗑️ Foto eliminada', '');
+        loadPhotos();
+      }
+    } catch (err) {
+      showToast('❌ Error al eliminar', 'error');
+    }
+  }
+
+  // ======== Modal ========
+  function openModal(src) {
+    document.getElementById('modalImg').src = src;
+    document.getElementById('modal').classList.add('open');
+  }
+
+  function closeModal() {
+    document.getElementById('modal').classList.remove('open');
+  }
+
+  // ======== Toast ========
+  function showToast(msg, type) {
+    const toast = document.getElementById('toast');
+    toast.textContent = msg;
+    toast.className = 'toast show ' + (type || '');
+    setTimeout(() => toast.classList.remove('show'), 3000);
+  }
+
+  // Cargar al inicio
+  loadPhotos();
+  setInterval(loadPhotos, 10000); // Actualizar cada 10 segundos
+</script>
+
+</body>
+</html>
