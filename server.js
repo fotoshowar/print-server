@@ -1,3 +1,7 @@
+/**
+ * FotoShow Print Server — Linux/Raspberry Pi version
+ * Usa CUPS para imprimir en vez de PowerShell
+ */
 require('dotenv').config();
 const express = require('express');
 const multer = require('multer');
@@ -10,7 +14,7 @@ const sharp = require('sharp');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const DEFAULT_PRINTER = process.env.DEFAULT_PRINTER || 'EPSON L805 Series';
+const DEFAULT_PRINTER = process.env.DEFAULT_PRINTER || '';
 const PUBLIC_DOMAIN = process.env.PUBLIC_DOMAIN || 'descarga.fotoshow.online';
 
 // Directorios
@@ -40,7 +44,7 @@ function saveDB(db) {
 // =================== STORAGE ===================
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    const today = new Date().toISOString().slice(0, 10); // 2026-03-25
+    const today = getToday();
     const dayDir = path.join(UPLOADS_DIR, today);
     fs.mkdirSync(dayDir, { recursive: true });
     cb(null, dayDir);
@@ -81,7 +85,6 @@ function getToday() {
   return new Date().toISOString().slice(0, 10);
 }
 
-// Generar thumbnail con sharp
 async function generateThumbnail(originalPath, filename, date) {
   const thumbDir = path.join(THUMBS_DIR, date);
   fs.mkdirSync(thumbDir, { recursive: true });
@@ -92,29 +95,69 @@ async function generateThumbnail(originalPath, filename, date) {
     const isHorizontal = (metadata.width || 0) > (metadata.height || 0);
 
     await sharp(originalPath)
-      .rotate() // auto-rotate based on EXIF
+      .rotate()
       .resize(400, 400, { fit: 'inside', withoutEnlargement: true })
       .jpeg({ quality: 75 })
       .toFile(thumbPath);
 
     return {
-      thumbPath,
-      width: metadata.width,
-      height: metadata.height,
-      isHorizontal,
-      size: fs.statSync(thumbPath).size
+      thumbPath, width: metadata.width, height: metadata.height,
+      isHorizontal, size: fs.statSync(thumbPath).size
     };
   } catch (err) {
     console.error(`[THUMB ERROR] ${filename}:`, err.message);
-    // Fallback: copiar original como thumb
     fs.copyFileSync(originalPath, thumbPath);
     return { thumbPath, width: 0, height: 0, isHorizontal: false, size: 0 };
   }
 }
 
+// Detectar impresora CUPS
+function getDefaultPrinter() {
+  return new Promise((resolve) => {
+    if (DEFAULT_PRINTER) return resolve(DEFAULT_PRINTER);
+    exec('lpstat -d 2>/dev/null', (err, stdout) => {
+      const match = stdout && stdout.match(/system default destination: (.+)/);
+      resolve(match ? match[1].trim() : '');
+    });
+  });
+}
+
+// Imprimir con CUPS (lp)
+async function printWithCUPS(filepath, printerName, options = {}) {
+  const printer = printerName || await getDefaultPrinter();
+  if (!printer) throw new Error('No hay impresora configurada');
+
+  const { landscape, paperSize } = options;
+  let cmd = `lp -d "${printer}"`;
+
+  // Opciones de papel
+  if (paperSize === 'A5') {
+    cmd += ' -o media=a5';
+  } else {
+    cmd += ' -o media=a4';
+  }
+
+  // Orientación
+  if (landscape) {
+    cmd += ' -o landscape';
+  }
+
+  // Ajustar a página
+  cmd += ' -o fit-to-page';
+
+  cmd += ` "${filepath}"`;
+
+  return new Promise((resolve, reject) => {
+    exec(cmd, (error, stdout, stderr) => {
+      if (error) reject(new Error(stderr || error.message));
+      else resolve(stdout.trim());
+    });
+  });
+}
+
 // =================== RUTAS API ===================
 
-// Subir foto(s) — genera thumbnail automáticamente
+// Subir fotos
 app.post('/api/upload', upload.array('photos', 200), async (req, res) => {
   if (!req.files || req.files.length === 0) {
     return res.status(400).json({ error: 'No se recibieron imagenes' });
@@ -126,8 +169,6 @@ app.post('/api/upload', upload.array('photos', 200), async (req, res) => {
 
   for (const file of req.files) {
     const shareCode = generateShareCode();
-
-    // Generar thumbnail
     const thumbInfo = await generateThumbnail(file.path, file.filename, today);
 
     const photoData = {
@@ -151,11 +192,11 @@ app.post('/api/upload', upload.array('photos', 200), async (req, res) => {
   }
 
   saveDB(db);
-  console.log(`[UPLOAD] ${results.length} foto(s) subida(s) - ${today}`);
+  console.log(`[UPLOAD] ${results.length} foto(s) - ${today}`);
   res.json({ success: true, photos: results });
 });
 
-// Listar fotos (con paginación y agrupación por día)
+// Listar fotos
 app.get('/api/photos', (req, res) => {
   const db = loadDB();
   const page = parseInt(req.query.page) || 1;
@@ -165,14 +206,10 @@ app.get('/api/photos', (req, res) => {
   let photos = Object.values(db.photos)
     .sort((a, b) => new Date(b.uploadedAt) - new Date(a.uploadedAt));
 
-  if (dateFilter) {
-    photos = photos.filter(p => p.date === dateFilter);
-  }
+  if (dateFilter) photos = photos.filter(p => p.date === dateFilter);
 
-  // Verificar que los archivos existen
   photos = photos.filter(p => {
     const origPath = path.join(UPLOADS_DIR, p.date || getToday(), p.filename);
-    // Fallback para fotos viejas sin date
     const oldPath = path.join(UPLOADS_DIR, p.filename);
     return fs.existsSync(origPath) || fs.existsSync(oldPath);
   });
@@ -180,7 +217,6 @@ app.get('/api/photos', (req, res) => {
   const total = photos.length;
   const paginated = photos.slice((page - 1) * limit, page * limit);
 
-  // Agrupar por día
   const grouped = {};
   for (const p of paginated) {
     const date = p.date || 'sin-fecha';
@@ -188,25 +224,7 @@ app.get('/api/photos', (req, res) => {
     grouped[date].push(p);
   }
 
-  res.json({
-    total,
-    page,
-    limit,
-    pages: Math.ceil(total / limit),
-    dates: Object.keys(grouped).sort().reverse(),
-    groups: grouped
-  });
-});
-
-// Listar días disponibles
-app.get('/api/dates', (req, res) => {
-  const db = loadDB();
-  const dates = {};
-  for (const p of Object.values(db.photos)) {
-    const d = p.date || 'sin-fecha';
-    dates[d] = (dates[d] || 0) + 1;
-  }
-  res.json(dates);
+  res.json({ total, page, limit, pages: Math.ceil(total / limit), dates: Object.keys(grouped).sort().reverse(), groups: grouped });
 });
 
 // Eliminar foto
@@ -214,18 +232,14 @@ app.delete('/api/photos/:filename', (req, res) => {
   const { filename } = req.params;
   const db = loadDB();
   const photo = db.photos[filename];
-
   if (!photo) return res.status(404).json({ error: 'Foto no encontrada' });
 
   const date = photo.date || getToday();
-
-  // Borrar original
   const origPath = path.join(UPLOADS_DIR, date, filename);
   const oldPath = path.join(UPLOADS_DIR, filename);
   if (fs.existsSync(origPath)) fs.unlinkSync(origPath);
   else if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
 
-  // Borrar thumbnail
   const thumbPath = path.join(THUMBS_DIR, date, filename);
   if (fs.existsSync(thumbPath)) fs.unlinkSync(thumbPath);
 
@@ -234,100 +248,145 @@ app.delete('/api/photos/:filename', (req, res) => {
   res.json({ success: true });
 });
 
-// Imprimir foto — detecta orientación automáticamente
-app.post('/api/print', (req, res) => {
+// Imprimir foto — CUPS
+app.post('/api/print', async (req, res) => {
   const { filename, printer, size } = req.body;
 
   if (!filename) return res.status(400).json({ error: 'Falta el nombre del archivo' });
 
   const db = loadDB();
   const photo = db.photos[filename];
-  if (!photo) return res.status(404).json({ error: 'Foto no encontrada en DB' });
+  if (!photo) return res.status(404).json({ error: 'Foto no encontrada' });
 
   const date = photo.date || getToday();
   let filepath = path.join(UPLOADS_DIR, date, filename);
   if (!fs.existsSync(filepath)) filepath = path.join(UPLOADS_DIR, filename);
   if (!fs.existsSync(filepath)) return res.status(404).json({ error: 'Archivo no encontrado' });
 
-  const printerName = printer || DEFAULT_PRINTER;
   const printSize = size || 'A4';
-
-  // Detectar orientación de la imagen
   const isHorizontal = photo.isHorizontal || false;
-
-  // Dimensiones en centésimas de pulgada
-  // Si la imagen es horizontal, invertir ancho/alto del papel (landscape)
-  const dimensions = {
-    'A4': isHorizontal ? { w: 1169, h: 827 } : { w: 827, h: 1169 },
-    'A5': isHorizontal ? { w: 827, h: 583 } : { w: 583, h: 827 }
-  };
-
-  const dim = dimensions[printSize] || dimensions['A4'];
   const orientation = isHorizontal ? 'Landscape' : 'Portrait';
 
-  console.log(`[PRINT] ${filename} -> ${printerName} (${printSize} ${orientation}) [${photo.width}x${photo.height}]`);
+  console.log(`[PRINT] ${filename} -> ${printer || 'default'} (${printSize} ${orientation})`);
 
-  const psScript = `
-Add-Type -AssemblyName System.Drawing
-$img = [System.Drawing.Image]::FromFile('${filepath.replace(/\\/g, '\\\\')}')
-
-# Auto-rotar segun EXIF
-foreach ($prop in $img.PropertyItems) {
-  if ($prop.Id -eq 0x0112) {
-    $orientation = [BitConverter]::ToUInt16($prop.Value, 0)
-    switch ($orientation) {
-      3 { $img.RotateFlip([System.Drawing.RotateFlipType]::Rotate180FlipNone) }
-      6 { $img.RotateFlip([System.Drawing.RotateFlipType]::Rotate90FlipNone) }
-      8 { $img.RotateFlip([System.Drawing.RotateFlipType]::Rotate270FlipNone) }
-    }
-    break
-  }
-}
-
-$pd = New-Object System.Drawing.Printing.PrintDocument
-$pd.PrinterSettings.PrinterName = '${printerName}'
-$pd.DefaultPageSettings.PaperSize = New-Object System.Drawing.Printing.PaperSize('${printSize}', ${dim.w}, ${dim.h})
-${isHorizontal ? "$pd.DefaultPageSettings.Landscape = $true" : ""}
-$pd.add_PrintPage({
-  param($sender, $e)
-  $pw = $e.PageBounds.Width
-  $ph = $e.PageBounds.Height
-  $margin = 10
-  $maxW = $pw - ($margin * 2)
-  $maxH = $ph - ($margin * 2)
-  $sw = $maxW / $img.Width
-  $sh = $maxH / $img.Height
-  $scale = [Math]::Min($sw, $sh)
-  $fw = [int]($img.Width * $scale)
-  $fh = [int]($img.Height * $scale)
-  $x = [int](($pw - $fw) / 2)
-  $y = [int](($ph - $fh) / 2)
-  $e.Graphics.DrawImage($img, $x, $y, $fw, $fh)
-  $e.HasMorePages = $false
-})
-$pd.Print()
-$img.Dispose()
-Write-Host "OK"
-`;
-
-  const tempScript = path.join(__dirname, `print_${Date.now()}.ps1`);
-  fs.writeFileSync(tempScript, psScript);
-
-  exec(`powershell -ExecutionPolicy Bypass -File "${tempScript}"`, (error, stdout, stderr) => {
-    try { fs.unlinkSync(tempScript); } catch(e) {}
-
-    if (error) {
-      console.error('[PRINT ERROR]', error.message);
-      return res.status(500).json({ error: 'Error al imprimir', detail: error.message });
-    }
+  try {
+    const result = await printWithCUPS(filepath, printer, {
+      landscape: isHorizontal,
+      paperSize: printSize
+    });
 
     const db2 = loadDB();
     if (db2.photos[filename]) db2.photos[filename].printed++;
     db2.stats.totalPrinted++;
     saveDB(db2);
 
-    res.json({ success: true, message: `Enviado a ${printerName} en ${printSize} (${orientation})` });
-  });
+    res.json({ success: true, message: `Enviado a imprimir (${printSize} ${orientation})` });
+  } catch (err) {
+    console.error('[PRINT ERROR]', err.message);
+    res.status(500).json({ error: 'Error al imprimir', detail: err.message });
+  }
+});
+
+// Imprimir hoja índice — CUPS
+app.post('/api/print-index', async (req, res) => {
+  const { filenames, cols, rows, printer } = req.body;
+  const db = loadDB();
+
+  if (!filenames || filenames.length === 0) {
+    return res.status(400).json({ error: 'No se enviaron fotos' });
+  }
+
+  const numCols = Math.max(1, Math.min(10, parseInt(cols) || 5));
+  const numRows = Math.max(1, Math.min(12, parseInt(rows) || 7));
+  const perPage = numCols * numRows;
+  const totalPages = Math.ceil(filenames.length / perPage);
+
+  console.log(`[INDEX] ${filenames.length} fotos, ${numCols}x${numRows}, ${totalPages} pagina(s)`);
+
+  const PAGE_W = 1240;
+  const PAGE_H = 1754;
+  const MARGIN = 20;
+  const GAP = 6;
+  const LABEL_H = 14;
+  const TITLE_H = 32;
+
+  const cellW = Math.floor((PAGE_W - MARGIN * 2 - GAP * (numCols - 1)) / numCols);
+  const cellH = Math.floor((PAGE_H - MARGIN * 2 - GAP * (numRows - 1) - TITLE_H) / numRows);
+
+  const indexPaths = [];
+
+  try {
+    for (let page = 0; page < totalPages; page++) {
+      const pagePhotos = filenames.slice(page * perPage, (page + 1) * perPage);
+      const composites = [];
+
+      const pageLabel = totalPages > 1 ? ` (${page + 1}/${totalPages})` : '';
+      const titleSvg = `<svg width="${PAGE_W}" height="${TITLE_H}">
+        <text x="${PAGE_W/2}" y="22" text-anchor="middle" font-family="Arial,sans-serif" font-size="18" font-weight="bold" fill="black">
+          FotoShow${pageLabel} — ${pagePhotos.length} fotos
+        </text>
+      </svg>`;
+      composites.push({ input: Buffer.from(titleSvg), top: MARGIN, left: 0 });
+
+      for (let i = 0; i < pagePhotos.length; i++) {
+        const fname = pagePhotos[i];
+        const photo = db.photos[fname];
+        if (!photo) continue;
+
+        const date = photo.date || getToday();
+        const col = i % numCols;
+        const row = Math.floor(i / numCols);
+        const x = MARGIN + col * (cellW + GAP);
+        const y = MARGIN + TITLE_H + row * (cellH + GAP);
+
+        let imgPath = path.join(THUMBS_DIR, date, fname);
+        if (!fs.existsSync(imgPath)) imgPath = path.join(UPLOADS_DIR, date, fname);
+        if (!fs.existsSync(imgPath)) continue;
+
+        try {
+          const resized = await sharp(imgPath)
+            .rotate()
+            .resize(cellW, cellH - LABEL_H, { fit: 'cover' })
+            .jpeg({ quality: 80 })
+            .toBuffer();
+          composites.push({ input: resized, top: y, left: x });
+
+          const globalNum = page * perPage + i + 1;
+          const numSvg = `<svg width="${cellW}" height="${LABEL_H}">
+            <rect width="${cellW}" height="${LABEL_H}" fill="white"/>
+            <text x="${cellW/2}" y="11" text-anchor="middle" font-family="Arial,sans-serif" font-size="9" fill="black">#${globalNum}</text>
+          </svg>`;
+          composites.push({ input: Buffer.from(numSvg), top: y + cellH - LABEL_H, left: x });
+        } catch (e) {
+          console.error(`[INDEX] Error foto ${fname}:`, e.message);
+        }
+      }
+
+      const pageBuffer = await sharp({
+        create: { width: PAGE_W, height: PAGE_H, channels: 3, background: { r: 255, g: 255, b: 255 } }
+      }).composite(composites).jpeg({ quality: 90 }).toBuffer();
+
+      const pagePath = path.join(__dirname, `index_${Date.now()}_p${page}.jpg`);
+      fs.writeFileSync(pagePath, pageBuffer);
+      indexPaths.push(pagePath);
+    }
+
+    // Imprimir con CUPS
+    for (const indexPath of indexPaths) {
+      try {
+        await printWithCUPS(indexPath, printer, { paperSize: 'A4' });
+      } catch (e) {
+        console.error('[INDEX PRINT ERROR]', e.message);
+      }
+      try { fs.unlinkSync(indexPath); } catch(e) {}
+    }
+
+    res.json({ success: true, message: `${totalPages} hoja(s) índice impresas (${filenames.length} fotos, ${numCols}x${numRows})` });
+  } catch (err) {
+    console.error('[INDEX ERROR]', err);
+    indexPaths.forEach(p => { try { fs.unlinkSync(p); } catch(e) {} });
+    res.status(500).json({ error: 'Error generando hoja indice' });
+  }
 });
 
 // =================== COMPARTIR / DESCARGAR ===================
@@ -364,7 +423,6 @@ app.get('/foto/:code', (req, res) => {
 </div></body></html>`);
 });
 
-// Descargar original
 app.get('/api/download/:filename', (req, res) => {
   const { filename } = req.params;
   const db = loadDB();
@@ -384,7 +442,6 @@ app.get('/api/download/:filename', (req, res) => {
   res.download(filepath, `FotoShow-${photo.shareCode}.jpg`);
 });
 
-// Info de compartir
 app.get('/api/share/:filename', (req, res) => {
   const { filename } = req.params;
   const db = loadDB();
@@ -397,158 +454,32 @@ app.get('/api/share/:filename', (req, res) => {
   res.json({ shareCode: photo.shareCode, shareURL, qrURL, filename: photo.filename, downloaded: photo.downloaded, printed: photo.printed });
 });
 
-// Imprimir hoja indice - por lote de fotos, configurable filas x columnas, multi-pagina
-app.post('/api/print-index', async (req, res) => {
-  const { filenames, cols, rows, printer } = req.body;
-  const printerName = printer || DEFAULT_PRINTER;
-  const db = loadDB();
-
-  if (!filenames || filenames.length === 0) {
-    return res.status(400).json({ error: 'No se enviaron fotos' });
-  }
-
-  const numCols = Math.max(1, Math.min(10, parseInt(cols) || 5));
-  const numRows = Math.max(1, Math.min(12, parseInt(rows) || 7));
-  const perPage = numCols * numRows;
-  const totalPages = Math.ceil(filenames.length / perPage);
-
-  console.log(`[INDEX] ${filenames.length} fotos, ${numCols}x${numRows}, ${totalPages} pagina(s)`);
-
-  // A4 a 150 DPI: 1240 x 1754 px
-  const PAGE_W = 1240;
-  const PAGE_H = 1754;
-  const MARGIN = 20;
-  const GAP = 6;
-  const LABEL_H = 14;
-  const TITLE_H = 32;
-
-  const cellW = Math.floor((PAGE_W - MARGIN * 2 - GAP * (numCols - 1)) / numCols);
-  const cellH = Math.floor((PAGE_H - MARGIN * 2 - GAP * (numRows - 1) - TITLE_H) / numRows);
-
-  const indexPaths = [];
-
-  try {
-    for (let page = 0; page < totalPages; page++) {
-      const pagePhotos = filenames.slice(page * perPage, (page + 1) * perPage);
-      const composites = [];
-
-      // Titulo
-      const pageLabel = totalPages > 1 ? ` (${page + 1}/${totalPages})` : '';
-      const titleSvg = `<svg width="${PAGE_W}" height="${TITLE_H}">
-        <text x="${PAGE_W/2}" y="22" text-anchor="middle" font-family="Arial,sans-serif" font-size="18" font-weight="bold" fill="black">
-          FotoShow${pageLabel} — ${pagePhotos.length} fotos
-        </text>
-      </svg>`;
-      composites.push({ input: Buffer.from(titleSvg), top: MARGIN, left: 0 });
-
-      for (let i = 0; i < pagePhotos.length; i++) {
-        const fname = pagePhotos[i];
-        const photo = db.photos[fname];
-        if (!photo) continue;
-
-        const date = photo.date || getToday();
-        const col = i % numCols;
-        const row = Math.floor(i / numCols);
-        const x = MARGIN + col * (cellW + GAP);
-        const y = MARGIN + TITLE_H + row * (cellH + GAP);
-
-        let imgPath = path.join(THUMBS_DIR, date, fname);
-        if (!fs.existsSync(imgPath)) imgPath = path.join(UPLOADS_DIR, date, fname);
-        if (!fs.existsSync(imgPath)) continue;
-
-        try {
-          const resized = await sharp(imgPath)
-            .rotate()
-            .resize(cellW, cellH - LABEL_H, { fit: 'cover' })
-            .jpeg({ quality: 80 })
-            .toBuffer();
-
-          composites.push({ input: resized, top: y, left: x });
-
-          const globalNum = page * perPage + i + 1;
-          const numSvg = `<svg width="${cellW}" height="${LABEL_H}">
-            <rect width="${cellW}" height="${LABEL_H}" fill="white"/>
-            <text x="${cellW/2}" y="11" text-anchor="middle" font-family="Arial,sans-serif" font-size="9" fill="black">#${globalNum}</text>
-          </svg>`;
-          composites.push({ input: Buffer.from(numSvg), top: y + cellH - LABEL_H, left: x });
-        } catch (e) {
-          console.error(`[INDEX] Error foto ${fname}:`, e.message);
-        }
-      }
-
-      const pageBuffer = await sharp({
-        create: { width: PAGE_W, height: PAGE_H, channels: 3, background: { r: 255, g: 255, b: 255 } }
-      }).composite(composites).jpeg({ quality: 90 }).toBuffer();
-
-      const pagePath = path.join(__dirname, `index_${Date.now()}_p${page}.jpg`);
-      fs.writeFileSync(pagePath, pageBuffer);
-      indexPaths.push(pagePath);
-    }
-
-    // Imprimir todas las paginas
-    let printed = 0;
-    for (const indexPath of indexPaths) {
-      const psScript = `
-Add-Type -AssemblyName System.Drawing
-$img = [System.Drawing.Image]::FromFile('${indexPath.replace(/\\/g, '\\\\')}')
-$pd = New-Object System.Drawing.Printing.PrintDocument
-$pd.PrinterSettings.PrinterName = '${printerName}'
-$pd.DefaultPageSettings.PaperSize = New-Object System.Drawing.Printing.PaperSize('A4', 827, 1169)
-$pd.add_PrintPage({
-  param($sender, $e)
-  $e.Graphics.DrawImage($img, 0, 0, $e.PageBounds.Width, $e.PageBounds.Height)
-  $e.HasMorePages = $false
-})
-$pd.Print()
-$img.Dispose()
-Write-Host "OK"
-`;
-      const tempScript = path.join(__dirname, `pi_${Date.now()}.ps1`);
-      fs.writeFileSync(tempScript, psScript);
-
-      await new Promise((resolve) => {
-        exec(`powershell -ExecutionPolicy Bypass -File "${tempScript}"`, () => {
-          try { fs.unlinkSync(tempScript); } catch(e) {}
-          try { fs.unlinkSync(indexPath); } catch(e) {}
-          printed++;
-          resolve();
-        });
-      });
-    }
-
-    res.json({ success: true, message: `${totalPages} hoja(s) índice impresas (${filenames.length} fotos, ${numCols}x${numRows})` });
-
-  } catch (err) {
-    console.error('[INDEX ERROR]', err);
-    indexPaths.forEach(p => { try { fs.unlinkSync(p); } catch(e) {} });
-    res.status(500).json({ error: 'Error generando hoja indice' });
-  }
-});
-
-// Stats
 app.get('/api/stats', (req, res) => {
   const db = loadDB();
   res.json(db.stats);
 });
 
-// Impresoras
+// Listar impresoras CUPS
 app.get('/api/printers', (req, res) => {
-  res.json(['EPSON L805 Series', 'EPSON L805 Series (Copiar 1)', 'Canon G1010 series']);
+  exec('lpstat -p 2>/dev/null', (err, stdout) => {
+    if (err) return res.json([]);
+    const printers = [];
+    for (const line of stdout.split('\n')) {
+      const match = line.match(/^printer (\S+)/);
+      if (match) printers.push(match[1]);
+    }
+    res.json(printers);
+  });
 });
 
-// Servir thumbnails (sin cache para dev, con cache en prod)
+// Servir archivos
 app.use('/thumbs', express.static(THUMBS_DIR, { maxAge: '1h' }));
-
-// Servir originales (solo para descarga/impresión)
-app.use('/uploads', (req, res, next) => {
-  res.set('Cache-Control', 'no-store');
-  next();
-}, express.static(UPLOADS_DIR));
+app.use('/uploads', (req, res, next) => { res.set('Cache-Control', 'no-store'); next(); }, express.static(UPLOADS_DIR));
 
 // =================== INICIAR ===================
 app.listen(PORT, '0.0.0.0', () => {
   const localIP = getLocalIP();
-  console.log(`\n🖨️  FotoShow Print Server v3.0`);
+  console.log(`\n🖨️  FotoShow Print Server v3.0 (Linux)`);
   console.log(`   Local:    http://localhost:${PORT}`);
   console.log(`   Red:      http://${localIP}:${PORT}`);
   console.log(`   Internet: https://${PUBLIC_DOMAIN}`);

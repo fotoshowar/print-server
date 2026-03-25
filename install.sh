@@ -54,19 +54,17 @@ usermod -aG lpadmin "$APP_USER" 2>/dev/null || true
 echo -e "${GREEN}[5/7]${NC} Instalando aplicación en $APP_DIR..."
 mkdir -p "$APP_DIR"
 
-# Copiar archivos (si estamos en el repo)
+# Copiar archivos
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-REPO_DIR="$(dirname "$SCRIPT_DIR")"
 
-if [ -f "$REPO_DIR/server.js" ]; then
-  echo "  Copiando desde repo local..."
-  cp "$REPO_DIR/server.js" "$APP_DIR/"
-  cp "$REPO_DIR/package.json" "$APP_DIR/"
-  cp "$REPO_DIR/package-lock.json" "$APP_DIR/" 2>/dev/null || true
-  cp -r "$REPO_DIR/public" "$APP_DIR/"
-  cp "$REPO_DIR/linux/server-linux.js" "$APP_DIR/server-linux.js"
+if [ -f "$SCRIPT_DIR/server.js" ]; then
+  echo "  Copiando archivos..."
+  cp "$SCRIPT_DIR/server.js" "$APP_DIR/"
+  cp "$SCRIPT_DIR/package.json" "$APP_DIR/"
+  cp "$SCRIPT_DIR/package-lock.json" "$APP_DIR/" 2>/dev/null || true
+  cp -r "$SCRIPT_DIR/public" "$APP_DIR/"
 else
-  echo -e "${RED}No se encontraron archivos del servidor. Clona el repo primero.${NC}"
+  echo -e "${RED}No se encontraron archivos del servidor.${NC}"
   exit 1
 fi
 
@@ -88,7 +86,7 @@ VPS_USER=root
 VPS_PASSWORD=
 VPS_TUNNEL_PORT=3001
 ENVFILE
-  echo -e "${YELLOW}  Edita: nano $APP_DIR/.env${NC}"
+  echo -e "${YELLOW}  Edita: sudo nano $APP_DIR/.env${NC}"
 fi
 
 # Instalar dependencias Node
@@ -111,7 +109,7 @@ After=network.target cups.service
 Type=simple
 User=$APP_USER
 WorkingDirectory=$APP_DIR
-ExecStart=/usr/bin/node $APP_DIR/server-linux.js
+ExecStart=/usr/bin/node $APP_DIR/server.js
 Restart=always
 RestartSec=5
 Environment=NODE_ENV=production
