@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const multer = require('multer');
 const cors = require('cors');
@@ -279,8 +280,9 @@ app.get('/api/share/:filename', (req, res) => {
 
   if (!photo) return res.status(404).json({ error: 'Foto no encontrada' });
 
-  const localIP = getLocalIP();
-  const shareURL = `http://${localIP}:${PORT}/foto/${photo.shareCode}`;
+  // Usar dominio publico si existe, sino IP local
+  const PUBLIC_DOMAIN = process.env.PUBLIC_DOMAIN || 'descarga.fotoshow.online';
+  const shareURL = `https://${PUBLIC_DOMAIN}/foto/${photo.shareCode}`;
 
   // URL para generar QR via API publica
   const qrURL = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(shareURL)}`;
