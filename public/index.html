@@ -1,183 +1,151 @@
 <!DOCTYPE html>
-<html lang="es" data-bs-theme="dark">
+<html lang="es">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>FotoShow — Imprimir</title>
+  <title>FotoShow Print</title>
   <link rel="icon" type="image/x-icon" href="https://fotoshow.online/static/favicon.ico">
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <style>
     :root {
-      --fs-green: #ADFF2F;
-      --fs-green-dark: #7CFC00;
-      --fs-green-rgb: 173, 255, 47;
-      --fs-green-glow: rgba(173, 255, 47, 0.22);
-      --fs-bg: #0a0a0a;
-      --fs-bg-card: #111111;
-      --fs-bg-card-2: #191919;
-      --fs-border: rgba(173, 255, 47, 0.14);
-      --fs-border-subtle: rgba(255, 255, 255, 0.07);
-      --fs-text: #e2e8f0;
-      --fs-text-muted: rgba(226, 232, 240, 0.55);
+      --fs-green:#ADFF2F;--fs-green-dark:#7CFC00;--fs-green-rgb:173,255,47;
+      --fs-green-glow:rgba(173,255,47,0.22);--fs-bg:#0a0a0a;--fs-bg-card:#111;
+      --fs-bg-card-2:#191919;--fs-border:rgba(173,255,47,0.14);
+      --fs-border-subtle:rgba(255,255,255,0.07);--fs-text:#e2e8f0;
+      --fs-text-muted:rgba(226,232,240,0.55);
     }
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{font-family:'Poppins',sans-serif;background:var(--fs-bg);color:var(--fs-text);min-height:100vh;padding-bottom:80px;}
 
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Poppins', sans-serif; background: var(--fs-bg); color: var(--fs-text); min-height: 100vh; }
-
-    /* Header */
-    header {
-      background: radial-gradient(ellipse 70% 60% at 20% 10%, rgba(173,255,47,0.08) 0%, transparent 55%), #0a0a0a;
-      border-bottom: 1px solid var(--fs-border);
-      padding: 12px 16px;
-      display: flex; align-items: center; justify-content: space-between;
-      position: sticky; top: 0; z-index: 100;
+    header{
+      background:radial-gradient(ellipse 70% 60% at 20% 10%,rgba(173,255,47,0.08) 0%,transparent 55%),#0a0a0a;
+      border-bottom:1px solid var(--fs-border);padding:10px 14px;
+      display:flex;align-items:center;justify-content:space-between;
+      position:sticky;top:0;z-index:100;
     }
-    .header-left { display: flex; align-items: center; gap: 10px; }
-    .logo { height: 32px; }
-    header h1 { font-size: 1rem; font-weight: 800; color: var(--fs-green); }
-    .stats-bar { font-size: 0.7rem; color: var(--fs-text-muted); }
+    .header-left{display:flex;align-items:center;gap:8px;}
+    .logo{height:28px;}
+    header h1{font-size:0.95rem;font-weight:800;color:var(--fs-green);}
+    .stats-bar{font-size:0.65rem;color:var(--fs-text-muted);}
 
-    .container { max-width: 600px; margin: 0 auto; padding: 12px; }
+    .container{max-width:700px;margin:0 auto;padding:10px;}
 
-    /* Upload Zone */
-    .upload-zone {
-      background: var(--fs-bg-card);
-      border: 2px dashed var(--fs-border);
-      border-radius: 16px;
-      padding: 24px 16px;
-      text-align: center;
-      cursor: pointer;
-      transition: all 0.3s;
-      margin-bottom: 12px;
+    /* Upload button - fixed bottom */
+    .upload-fab{
+      position:fixed;bottom:16px;right:16px;z-index:200;
+      background:var(--fs-green);color:#0a0a0a;border:none;border-radius:50%;
+      width:56px;height:56px;font-size:1.5rem;cursor:pointer;
+      box-shadow:0 4px 20px var(--fs-green-glow);
+      display:flex;align-items:center;justify-content:center;
+      transition:all 0.2s;
     }
-    .upload-zone:hover, .upload-zone.drag-over {
-      border-color: var(--fs-green);
-      background: rgba(173,255,47,0.04);
-      box-shadow: 0 0 30px rgba(173,255,47,0.08);
-    }
-    .upload-zone .icon { font-size: 2.5rem; margin-bottom: 4px; }
-    .upload-zone p { color: var(--fs-text-muted); font-size: 0.85rem; }
-    .upload-zone input[type="file"] { display: none; }
+    .upload-fab:hover{transform:scale(1.1);box-shadow:0 6px 30px var(--fs-green-glow);}
+    .upload-fab input{display:none;}
 
-    .btn-fs {
-      display: inline-block; background: var(--fs-green); color: #0a0a0a; border: none;
-      border-radius: 10px; padding: 12px 28px; font-size: 0.95rem; font-weight: 700;
-      cursor: pointer; transition: all 0.2s; font-family: 'Poppins', sans-serif;
+    /* Upload compact zone */
+    .upload-zone{
+      background:var(--fs-bg-card);border:1px dashed var(--fs-border);
+      border-radius:12px;padding:14px;text-align:center;margin-bottom:10px;
+      cursor:pointer;transition:all 0.3s;display:none;
     }
-    .btn-fs:hover { background: var(--fs-green-dark); box-shadow: 0 0 20px var(--fs-green-glow); }
+    .upload-zone.visible{display:block;cursor:pointer;}
+    .upload-zone:hover{border-color:var(--fs-green);background:rgba(173,255,47,0.03);}
+    .upload-zone p{color:var(--fs-text-muted);font-size:0.8rem;}
 
     /* Progress */
-    .upload-progress { display: none; background: var(--fs-bg-card); border-radius: 12px; padding: 12px 16px; margin-bottom: 12px; border: 1px solid var(--fs-border-subtle); }
-    .progress-bar { height: 6px; background: var(--fs-bg-card-2); border-radius: 3px; overflow: hidden; margin-top: 6px; }
-    .progress-fill { height: 100%; background: var(--fs-green); border-radius: 3px; transition: width 0.3s; width: 0%; }
+    .upload-progress{display:none;background:var(--fs-bg-card);border-radius:10px;padding:10px 14px;margin-bottom:10px;border:1px solid var(--fs-border-subtle);}
+    .progress-bar{height:4px;background:var(--fs-bg-card-2);border-radius:2px;overflow:hidden;margin-top:4px;}
+    .progress-fill{height:100%;background:var(--fs-green);border-radius:2px;transition:width 0.3s;width:0%;}
 
-    /* Counter */
-    .photo-count {
-      font-size: 0.85rem; color: var(--fs-text-muted); margin-bottom: 10px;
-      display: flex; align-items: center; justify-content: space-between;
+    /* Day header */
+    .day-header{
+      font-size:0.8rem;font-weight:700;color:var(--fs-green);
+      padding:8px 0 6px;border-bottom:1px solid var(--fs-border);
+      margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;
     }
+    .day-header .count{font-size:0.7rem;color:var(--fs-text-muted);font-weight:500;}
 
-    /* Grid */
-    .photo-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 16px; }
+    /* Photo grid - 3 columns mobile, 4 desktop */
+    .photo-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:14px;}
+    @media(min-width:600px){.photo-grid{grid-template-columns:repeat(4,1fr);gap:8px;}}
+    @media(min-width:900px){.photo-grid{grid-template-columns:repeat(5,1fr);}}
 
-    .photo-card {
-      background: var(--fs-bg-card); border-radius: 12px; overflow: hidden;
-      border: 1px solid var(--fs-border-subtle);
-      transition: all 0.3s;
+    .photo-card{
+      background:var(--fs-bg-card);border-radius:8px;overflow:hidden;
+      border:1px solid var(--fs-border-subtle);transition:all 0.2s;
+      position:relative;
     }
-    .photo-card:hover { border-color: var(--fs-border); box-shadow: 0 4px 20px rgba(173,255,47,0.06); }
-    .photo-card img { width: 100%; height: 150px; object-fit: cover; display: block; cursor: pointer; }
-    .photo-card .actions { padding: 8px; display: flex; flex-direction: column; gap: 4px; }
-    .photo-card .actions .row { display: flex; gap: 4px; }
-
-    .btn {
-      flex: 1; padding: 8px 4px; border: none; border-radius: 8px;
-      font-size: 0.72rem; font-weight: 700; cursor: pointer; transition: all 0.2s;
-      display: flex; align-items: center; justify-content: center; gap: 3px;
-      font-family: 'Poppins', sans-serif;
+    .photo-card:hover{border-color:var(--fs-border);}
+    .photo-card img{width:100%;aspect-ratio:3/4;object-fit:cover;display:block;cursor:pointer;}
+    .photo-card img.horizontal{aspect-ratio:3/4;}
+    .photo-card .overlay{
+      position:absolute;bottom:0;left:0;right:0;
+      background:linear-gradient(transparent,rgba(0,0,0,0.8));
+      padding:4px 6px;display:flex;gap:3px;opacity:0;transition:opacity 0.2s;
     }
-    .btn-a4 { background: rgba(173,255,47,0.15); color: var(--fs-green); border: 1px solid rgba(173,255,47,0.3); }
-    .btn-a4:hover { background: rgba(173,255,47,0.25); }
-    .btn-a5 { background: rgba(124,252,0,0.12); color: var(--fs-green-dark); border: 1px solid rgba(124,252,0,0.25); }
-    .btn-a5:hover { background: rgba(124,252,0,0.22); }
-    .btn-share { background: rgba(0,255,127,0.12); color: #00FF7F; border: 1px solid rgba(0,255,127,0.25); }
-    .btn-share:hover { background: rgba(0,255,127,0.22); }
-    .btn-delete { background: rgba(255,50,50,0.1); color: #ff6b6b; flex: 0; padding: 8px 10px; border: 1px solid rgba(255,50,50,0.2); }
-    .btn-delete:hover { background: rgba(255,50,50,0.2); }
-    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .photo-card:hover .overlay{opacity:1;}
+    /* Always show on mobile */
+    @media(max-width:600px){.photo-card .overlay{opacity:1;}}
+
+    .btn-sm{
+      flex:1;padding:5px 2px;border:none;border-radius:5px;
+      font-size:0.6rem;font-weight:700;cursor:pointer;
+      font-family:'Poppins',sans-serif;text-align:center;
+    }
+    .btn-sm.print{background:rgba(173,255,47,0.2);color:var(--fs-green);}
+    .btn-sm.share{background:rgba(0,255,127,0.2);color:#00FF7F;}
+    .btn-sm.del{background:rgba(255,50,50,0.2);color:#ff6b6b;flex:0;padding:5px 6px;}
+
+    /* Selected photo actions bar */
+    .action-bar{
+      display:none;position:fixed;bottom:0;left:0;right:0;
+      background:var(--fs-bg-card);border-top:1px solid var(--fs-border);
+      padding:10px 14px;z-index:150;
+    }
+    .action-bar.visible{display:flex;gap:8px;align-items:center;justify-content:center;}
+    .action-bar .btn-action{
+      padding:10px 16px;border:none;border-radius:10px;
+      font-size:0.85rem;font-weight:700;cursor:pointer;
+      font-family:'Poppins',sans-serif;
+    }
+    .action-bar .btn-a4{background:var(--fs-green);color:#0a0a0a;}
+    .action-bar .btn-a5{background:var(--fs-green-dark);color:#0a0a0a;}
+    .action-bar .btn-qr{background:rgba(0,255,127,0.2);color:#00FF7F;border:1px solid rgba(0,255,127,0.3);}
+    .action-bar .btn-del{background:rgba(255,50,50,0.15);color:#ff6b6b;border:1px solid rgba(255,50,50,0.2);}
+
+    .photo-card.selected{border:2px solid var(--fs-green);box-shadow:0 0 12px var(--fs-green-glow);}
 
     /* Share Modal */
-    .modal {
-      display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.9);
-      z-index: 1000; align-items: center; justify-content: center; padding: 20px;
-    }
-    .modal.open { display: flex; }
-    .modal-content {
-      background: var(--fs-bg-card); border: 1px solid var(--fs-border);
-      border-radius: 20px; padding: 24px; max-width: 360px; width: 100%; text-align: center;
-    }
-    .modal-content img.preview { width: 100%; max-height: 180px; object-fit: contain; border-radius: 10px; margin: 10px 0; }
-    .modal-content img.qr { width: 180px; height: 180px; border-radius: 8px; margin: 10px auto; background: white; padding: 8px; }
-    .modal-content h3 { font-size: 1rem; margin-bottom: 6px; color: var(--fs-green); }
-    .modal-content p { color: var(--fs-text-muted); font-size: 0.8rem; margin-bottom: 6px; }
-    .share-code {
-      font-size: 1.8rem; font-weight: 900; color: var(--fs-green); letter-spacing: 4px;
-      background: var(--fs-bg); padding: 10px 16px; border-radius: 10px; margin: 8px 0;
-      font-family: monospace; border: 1px solid var(--fs-border);
-      text-shadow: 0 0 10px var(--fs-green-glow);
-    }
-    .share-url {
-      font-size: 0.7rem; color: var(--fs-text-muted); word-break: break-all;
-      background: var(--fs-bg); padding: 8px 12px; border-radius: 8px; margin: 8px 0;
-      cursor: pointer; border: 1px solid var(--fs-border-subtle);
-    }
-    .share-url:hover { color: var(--fs-green); border-color: var(--fs-border); }
-    .modal-close {
-      background: var(--fs-bg-card-2); color: var(--fs-text); border: 1px solid var(--fs-border-subtle);
-      border-radius: 10px; padding: 10px 24px; font-size: 0.9rem; cursor: pointer; margin-top: 10px;
-      font-weight: 600; font-family: 'Poppins', sans-serif;
-    }
-    .modal-close:hover { border-color: var(--fs-border); }
+    .modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.9);z-index:1000;align-items:center;justify-content:center;padding:20px;}
+    .modal.open{display:flex;}
+    .modal-content{background:var(--fs-bg-card);border:1px solid var(--fs-border);border-radius:20px;padding:20px;max-width:340px;width:100%;text-align:center;}
+    .modal-content img.preview{width:100%;max-height:160px;object-fit:contain;border-radius:10px;margin:8px 0;}
+    .modal-content img.qr{width:160px;height:160px;border-radius:8px;margin:8px auto;background:white;padding:6px;}
+    .modal-content h3{font-size:0.95rem;color:var(--fs-green);}
+    .share-code{font-size:1.6rem;font-weight:900;color:var(--fs-green);letter-spacing:4px;background:var(--fs-bg);padding:8px 14px;border-radius:10px;margin:6px 0;font-family:monospace;border:1px solid var(--fs-border);text-shadow:0 0 10px var(--fs-green-glow);}
+    .share-url{font-size:0.65rem;color:var(--fs-text-muted);word-break:break-all;background:var(--fs-bg);padding:6px 10px;border-radius:8px;margin:6px 0;cursor:pointer;border:1px solid var(--fs-border-subtle);}
+    .share-url:hover{color:var(--fs-green);}
+    .modal-close{background:var(--fs-bg-card-2);color:var(--fs-text);border:1px solid var(--fs-border-subtle);border-radius:10px;padding:8px 20px;font-size:0.85rem;cursor:pointer;margin-top:8px;font-weight:600;font-family:'Poppins',sans-serif;}
 
     /* Preview Modal */
-    .preview-modal {
-      display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.95);
-      z-index: 1001; align-items: center; justify-content: center; padding: 16px;
-    }
-    .preview-modal.open { display: flex; }
-    .preview-modal img { max-width: 100%; max-height: 85vh; object-fit: contain; border-radius: 8px; }
-    .preview-close {
-      position: absolute; top: 12px; right: 12px; background: rgba(173,255,47,0.15);
-      border: 1px solid rgba(173,255,47,0.3); width: 40px; height: 40px; border-radius: 50%;
-      font-size: 1.3rem; cursor: pointer; color: var(--fs-green);
-      display: flex; align-items: center; justify-content: center;
-    }
+    .preview-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.95);z-index:1001;align-items:center;justify-content:center;padding:10px;}
+    .preview-modal.open{display:flex;flex-direction:column;gap:10px;}
+    .preview-modal img{max-width:100%;max-height:75vh;object-fit:contain;border-radius:8px;}
+    .preview-actions{display:flex;gap:8px;justify-content:center;}
+    .preview-actions .btn-action{padding:10px 20px;border:none;border-radius:10px;font-size:0.9rem;font-weight:700;cursor:pointer;font-family:'Poppins',sans-serif;}
+    .preview-close{position:absolute;top:10px;right:10px;background:rgba(173,255,47,0.15);border:1px solid rgba(173,255,47,0.3);width:36px;height:36px;border-radius:50%;font-size:1.2rem;cursor:pointer;color:var(--fs-green);display:flex;align-items:center;justify-content:center;}
 
     /* Toast */
-    .toast {
-      position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(100px);
-      background: var(--fs-bg-card); color: var(--fs-text); padding: 12px 20px; border-radius: 10px;
-      font-size: 0.85rem; transition: transform 0.3s; z-index: 2000; max-width: 320px;
-      text-align: center; border: 1px solid var(--fs-border); font-family: 'Poppins', sans-serif;
-    }
-    .toast.show { transform: translateX(-50%) translateY(0); }
-    .toast.success { border-color: var(--fs-green); color: var(--fs-green); }
-    .toast.error { border-color: #ff4444; color: #ff6b6b; }
+    .toast{position:fixed;top:60px;left:50%;transform:translateX(-50%) translateY(-80px);background:var(--fs-bg-card);color:var(--fs-text);padding:10px 18px;border-radius:10px;font-size:0.8rem;transition:transform 0.3s;z-index:2000;max-width:300px;text-align:center;border:1px solid var(--fs-border);font-family:'Poppins',sans-serif;}
+    .toast.show{transform:translateX(-50%) translateY(0);}
+    .toast.success{border-color:var(--fs-green);color:var(--fs-green);}
+    .toast.error{border-color:#ff4444;color:#ff6b6b;}
 
-    .empty-state { text-align: center; padding: 40px 16px; color: var(--fs-text-muted); grid-column: 1/-1; }
-    .empty-state .icon { font-size: 3rem; margin-bottom: 8px; }
-
-    .spinner {
-      display: inline-block; width: 14px; height: 14px;
-      border: 2px solid rgba(173,255,47,0.3); border-top-color: var(--fs-green);
-      border-radius: 50%; animation: spin 0.7s linear infinite;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
-
-    .badge-fs {
-      font-size: 0.65rem; background: rgba(173,255,47,0.1); padding: 3px 8px;
-      border-radius: 6px; color: var(--fs-green); border: 1px solid rgba(173,255,47,0.2);
-    }
+    .empty-state{text-align:center;padding:40px 16px;color:var(--fs-text-muted);}
+    .empty-state .icon{font-size:3rem;margin-bottom:8px;}
+    .spinner{display:inline-block;width:14px;height:14px;border:2px solid rgba(173,255,47,0.3);border-top-color:var(--fs-green);border-radius:50%;animation:spin 0.7s linear infinite;}
+    @keyframes spin{to{transform:rotate(360deg);}}
+    .badge-fs{font-size:0.6rem;background:rgba(173,255,47,0.1);padding:2px 6px;border-radius:5px;color:var(--fs-green);border:1px solid rgba(173,255,47,0.2);}
   </style>
 </head>
 <body>
@@ -187,200 +155,346 @@
     <img src="https://fotoshow.online/static/logo.png" class="logo" alt="FotoShow" onerror="this.style.display='none'">
     <div>
       <h1>FotoShow Print</h1>
-      <div class="stats-bar" id="statsBar">📸 Cargando...</div>
+      <div class="stats-bar" id="statsBar">Cargando...</div>
     </div>
   </div>
+  <span class="badge-fs" id="printCount"></span>
 </header>
 
 <div class="container">
-  <!-- Upload -->
-  <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()">
-    <div class="icon">📸</div>
-    <p>Toca para seleccionar fotos</p>
-    <input type="file" id="fileInput" accept="image/*" multiple capture="environment">
-    <button class="btn-fs" onclick="event.stopPropagation(); document.getElementById('fileInput').click()">
-      Seleccionar Fotos
-    </button>
+  <!-- Upload zone siempre visible -->
+  <div class="upload-zone visible" onclick="document.getElementById('fileInput').click()">
+    <p>📸 Toca para subir fotos (hasta 200)</p>
   </div>
 
   <div class="upload-progress" id="uploadProgress">
-    <p id="progressText" style="font-size:0.85rem;">Subiendo...</p>
+    <p id="progressText" style="font-size:0.8rem;">Subiendo...</p>
     <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
   </div>
+  <div id="content"></div>
+</div>
 
-  <!-- Counter -->
-  <div class="photo-count">
-    <span id="photoCount">🖼️ 0 fotos</span>
-    <span id="printCount" class="badge-fs"></span>
-  </div>
+<!-- FAB Upload -->
+<button class="upload-fab" onclick="document.getElementById('fileInput').click()">📸</button>
+<input type="file" id="fileInput" accept="image/*" multiple style="display:none">
 
-  <!-- Grid -->
-  <div class="photo-grid" id="photoGrid">
-    <div class="empty-state">
-      <div class="icon">📂</div>
-      <p>No hay fotos aún.<br>Subí una para empezar.</p>
-    </div>
-  </div>
+<!-- Action bar for selected photo -->
+<div class="action-bar" id="actionBar">
+  <button class="btn-action btn-a4" onclick="printSelected('A4')">🖨️ A4</button>
+  <button class="btn-action btn-a5" onclick="printSelected('A5')">📄 A5</button>
+  <button class="btn-action btn-qr" onclick="shareSelected()">📤 QR</button>
+  <button class="btn-action btn-del" onclick="deleteSelected()">🗑️</button>
 </div>
 
 <!-- Share Modal -->
-<div class="modal" id="shareModal">
+<div class="modal" id="shareModal" onclick="if(event.target===this)closeShareModal()">
   <div class="modal-content">
-    <h3>📤 Compartir Foto</h3>
+    <h3>📤 Compartir</h3>
     <img class="preview" id="sharePreview" src="" alt="">
-    <p>Código de descarga:</p>
     <div class="share-code" id="shareCode">------</div>
     <img class="qr" id="shareQR" src="" alt="QR">
-    <div class="share-url" id="shareURL" onclick="copyURL()">Toca para copiar link</div>
-    <p style="font-size:0.7rem;color:var(--fs-text-muted);">El cliente escanea el QR para descargar la foto</p>
+    <div class="share-url" id="shareURL" onclick="copyURL()">Toca para copiar</div>
     <button class="modal-close" onclick="closeShareModal()">Cerrar</button>
   </div>
 </div>
 
 <!-- Preview Modal -->
-<div class="preview-modal" id="previewModal" onclick="closePreview()">
-  <button class="preview-close">✕</button>
+<div class="preview-modal" id="previewModal" onclick="if(event.target===this)closePreview()">
+  <button class="preview-close" onclick="closePreview()">✕</button>
   <img id="previewImg" src="" alt="">
+  <div class="preview-actions">
+    <button class="btn-action btn-a4" onclick="printPreview('A4')">🖨️ A4</button>
+    <button class="btn-action btn-a5" onclick="printPreview('A5')">📄 A5</button>
+    <button class="btn-action btn-qr" onclick="sharePreview()">📤 QR</button>
+    <button class="btn-action btn-del" style="background:rgba(255,50,50,0.15);color:#ff6b6b;border:1px solid rgba(255,50,50,0.2);" onclick="if(confirm('¿Eliminar?')){closePreview();deletePhoto(currentPreviewFile)}">🗑️</button>
+  </div>
 </div>
 
-<!-- Toast -->
+<!-- Index Config Modal -->
+<div class="modal" id="indexModal" onclick="if(event.target===this)closeIndexModal()">
+  <div class="modal-content" style="max-width:320px;">
+    <h3>🖨️ Imprimir Índice</h3>
+    <p style="margin:8px 0;"><span id="indexCount">0</span> fotos</p>
+    <div style="display:flex;gap:10px;justify-content:center;align-items:center;margin:12px 0;">
+      <div style="text-align:center;">
+        <label style="font-size:0.7rem;color:var(--fs-text-muted);">Columnas</label><br>
+        <select id="indexCols" onchange="updateIndexPreview()" style="background:var(--fs-bg);color:var(--fs-green);border:1px solid var(--fs-border);border-radius:8px;padding:8px 12px;font-size:1.1rem;font-weight:700;font-family:'Poppins',sans-serif;text-align:center;">
+          <option value="3">3</option>
+          <option value="4">4</option>
+          <option value="5" selected>5</option>
+          <option value="6">6</option>
+          <option value="7">7</option>
+          <option value="8">8</option>
+        </select>
+      </div>
+      <span style="font-size:1.2rem;color:var(--fs-text-muted);margin-top:14px;">×</span>
+      <div style="text-align:center;">
+        <label style="font-size:0.7rem;color:var(--fs-text-muted);">Filas</label><br>
+        <select id="indexRows" onchange="updateIndexPreview()" style="background:var(--fs-bg);color:var(--fs-green);border:1px solid var(--fs-border);border-radius:8px;padding:8px 12px;font-size:1.1rem;font-weight:700;font-family:'Poppins',sans-serif;text-align:center;">
+          <option value="4">4</option>
+          <option value="5">5</option>
+          <option value="6">6</option>
+          <option value="7" selected>7</option>
+          <option value="8">8</option>
+          <option value="9">9</option>
+          <option value="10">10</option>
+        </select>
+      </div>
+    </div>
+    <p id="indexPages" style="font-size:0.75rem;color:var(--fs-text-muted);margin-bottom:12px;">1 hoja(s) — 5×7 = 35 por hoja</p>
+    <button onclick="printIndex()" style="background:var(--fs-green);color:#0a0a0a;border:none;border-radius:10px;padding:12px 24px;font-size:1rem;font-weight:700;cursor:pointer;width:100%;font-family:'Poppins',sans-serif;">🖨️ Imprimir Índice</button>
+    <button class="modal-close" onclick="closeIndexModal()" style="margin-top:8px;">Cancelar</button>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
-  let photos = [];
-  let currentShareURL = '';
+let allPhotos = {};
+let selectedPhoto = null;
+let currentPreviewFile = null;
+let currentShareURL = '';
 
-  const fileInput = document.getElementById('fileInput');
-  fileInput.addEventListener('change', (e) => {
-    const files = Array.from(e.target.files);
-    if (files.length > 0) uploadPhotos(files);
-    fileInput.value = '';
-  });
+const fileInput = document.getElementById('fileInput');
+fileInput.addEventListener('change', e => {
+  const files = Array.from(e.target.files);
+  if (files.length > 0) uploadPhotos(files);
+  fileInput.value = '';
+});
 
-  const uploadZone = document.getElementById('uploadZone');
-  uploadZone.addEventListener('dragover', (e) => { e.preventDefault(); uploadZone.classList.add('drag-over'); });
-  uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('drag-over'));
-  uploadZone.addEventListener('drop', (e) => {
-    e.preventDefault(); uploadZone.classList.remove('drag-over');
-    const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
-    if (files.length > 0) uploadPhotos(files);
-  });
+async function uploadPhotos(files) {
+  const el = document.getElementById('uploadProgress');
+  const fill = document.getElementById('progressFill');
+  const txt = document.getElementById('progressText');
+  el.style.display = 'block';
+  txt.textContent = `Subiendo ${files.length} foto(s)...`;
+  fill.style.width = '10%';
+  const fd = new FormData();
+  files.forEach(f => fd.append('photos', f));
+  try {
+    let p = 10;
+    const iv = setInterval(() => { p = Math.min(p + 10, 90); fill.style.width = p + '%'; }, 300);
+    const res = await fetch('/api/upload', { method: 'POST', body: fd });
+    clearInterval(iv); fill.style.width = '100%';
+    if (!res.ok) throw new Error('Error');
+    const data = await res.json();
+    showToast(`✅ ${data.photos.length} foto(s) subida(s)`, 'success');
+    const uploadedFiles = data.photos.map(p => p.filename);
+    setTimeout(() => {
+      el.style.display = 'none';
+      loadPhotos();
+      // Ofrecer imprimir indice
+      if (uploadedFiles.length > 1) {
+        setTimeout(() => showIndexModal(uploadedFiles), 500);
+      }
+    }, 500);
+  } catch (err) { el.style.display = 'none'; showToast('❌ Error al subir', 'error'); }
+}
 
-  async function uploadPhotos(files) {
-    const progressEl = document.getElementById('uploadProgress');
-    const progressFill = document.getElementById('progressFill');
-    const progressText = document.getElementById('progressText');
-    progressEl.style.display = 'block';
-    progressText.textContent = `Subiendo ${files.length} foto(s)...`;
-    progressFill.style.width = '10%';
-    const formData = new FormData();
-    files.forEach(f => formData.append('photos', f));
-    try {
-      let progress = 10;
-      const interval = setInterval(() => { progress = Math.min(progress + 15, 90); progressFill.style.width = progress + '%'; }, 200);
-      const res = await fetch('/api/upload', { method: 'POST', body: formData });
-      clearInterval(interval);
-      progressFill.style.width = '100%';
-      if (!res.ok) throw new Error('Error');
-      showToast(`✅ ${files.length} foto(s) subida(s)!`, 'success');
-      setTimeout(() => { progressEl.style.display = 'none'; loadPhotos(); }, 500);
-    } catch (err) { progressEl.style.display = 'none'; showToast('❌ Error al subir', 'error'); }
+async function loadPhotos() {
+  try {
+    const res = await fetch('/api/photos?limit=500');
+    const data = await res.json();
+    allPhotos = data.groups || {};
+    renderAll(data);
+    updateStats();
+  } catch (err) { console.error(err); }
+}
+
+function renderAll(data) {
+  const el = document.getElementById('content');
+  if (data.total === 0) {
+    el.innerHTML = '<div class="empty-state"><div class="icon">📸</div><p>No hay fotos.<br>Tocá 📸 para subir.</p></div>';
+    return;
   }
-
-  async function loadPhotos() {
-    try {
-      const res = await fetch('/api/photos');
-      photos = await res.json();
-      renderPhotos(); updateStats();
-    } catch (err) { console.error(err); }
-  }
-
-  function renderPhotos() {
-    const grid = document.getElementById('photoGrid');
-    document.getElementById('photoCount').textContent = `🖼️ ${photos.length} foto(s)`;
-    if (photos.length === 0) {
-      grid.innerHTML = '<div class="empty-state"><div class="icon">📂</div><p>No hay fotos aún.<br>Subí una para empezar.</p></div>';
-      return;
-    }
-    grid.innerHTML = photos.map(p => `
-      <div class="photo-card">
-        <img src="/uploads/${p.filename}?t=${Date.now()}" alt="Foto" onclick="openPreview('/uploads/${p.filename}')">
-        <div class="actions">
-          <div class="row">
-            <button class="btn btn-a4" onclick="printPhoto('${p.filename}', 'A4', this)">🖨️ A4</button>
-            <button class="btn btn-a5" onclick="printPhoto('${p.filename}', 'A5', this)">📄 A5</button>
-          </div>
-          <div class="row">
-            <button class="btn btn-share" onclick="sharePhoto('${p.filename}')">📤 QR</button>
-            <button class="btn btn-delete" onclick="deletePhoto('${p.filename}')">🗑️</button>
-          </div>
+  let html = '';
+  for (const date of data.dates) {
+    const photos = data.groups[date];
+    const label = formatDate(date);
+    html += `<div class="day-header">
+      <span>📅 ${label}</span>
+      <span style="display:flex;gap:6px;align-items:center;">
+        <span class="count">${photos.length} fotos</span>
+        <button onclick="printIndexForDate('${date}')" style="background:var(--fs-green);color:#0a0a0a;border:none;border-radius:6px;padding:3px 8px;font-size:0.65rem;font-weight:700;cursor:pointer;font-family:'Poppins',sans-serif;">🖨️ Índice</button>
+      </span>
+    </div>`;
+    html += '<div class="photo-grid">';
+    for (const p of photos) {
+      const cls = p.isHorizontal ? 'horizontal' : '';
+      const sel = selectedPhoto === p.filename ? 'selected' : '';
+      html += `<div class="photo-card ${sel}" id="card-${p.filename}">
+        <img class="${cls}" src="/thumbs/${p.date}/${p.filename}" loading="lazy"
+             onerror="this.src='/uploads/${p.date}/${p.filename}'"
+             onclick="openPreview('${p.filename}','${p.date}')"
+             oncontextmenu="event.preventDefault();selectPhoto('${p.filename}')">
+        <div class="overlay">
+          <button class="btn-sm print" onclick="event.stopPropagation();printPhoto('${p.filename}','A4',this)">A4</button>
+          <button class="btn-sm print" onclick="event.stopPropagation();printPhoto('${p.filename}','A5',this)">A5</button>
+          <button class="btn-sm share" onclick="event.stopPropagation();sharePhoto('${p.filename}')">QR</button>
         </div>
-      </div>
-    `).join('');
+      </div>`;
+    }
+    html += '</div>';
   }
+  el.innerHTML = html;
+}
 
-  async function updateStats() {
-    try {
-      const res = await fetch('/api/stats');
-      const s = await res.json();
-      document.getElementById('statsBar').textContent = `📸 ${photos.length} fotos`;
-      document.getElementById('printCount').textContent = `🖨️ ${s.totalPrinted} impresas · ⬇️ ${s.totalDownloaded} descargas`;
-    } catch(e) {}
+function formatDate(d) {
+  const today = new Date().toISOString().slice(0,10);
+  const yesterday = new Date(Date.now()-86400000).toISOString().slice(0,10);
+  if (d === today) return 'Hoy';
+  if (d === yesterday) return 'Ayer';
+  const [y,m,day] = d.split('-');
+  return `${day}/${m}/${y}`;
+}
+
+function selectPhoto(filename) {
+  if (selectedPhoto === filename) {
+    selectedPhoto = null;
+    document.getElementById('actionBar').classList.remove('visible');
+  } else {
+    if (selectedPhoto) {
+      const prev = document.getElementById('card-' + selectedPhoto);
+      if (prev) prev.classList.remove('selected');
+    }
+    selectedPhoto = filename;
+    document.getElementById('actionBar').classList.add('visible');
   }
+  const card = document.getElementById('card-' + filename);
+  if (card) card.classList.toggle('selected', selectedPhoto === filename);
+}
 
-  async function printPhoto(filename, size, btn) {
-    const orig = btn.innerHTML;
-    btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>';
-    try {
-      const res = await fetch('/api/print', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ filename, size, printer: 'EPSON L805 Series' })
-      });
-      const data = await res.json();
-      if (data.success) { showToast(`✅ Imprimiendo en ${size}`, 'success'); updateStats(); }
-      else showToast('❌ Error', 'error');
-    } catch (err) { showToast('❌ Error de conexión', 'error'); }
-    finally { btn.disabled = false; btn.innerHTML = orig; }
+async function printPhoto(filename, size, btn) {
+  const orig = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>'; }
+  try {
+    const res = await fetch('/api/print', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ filename, size, printer: 'EPSON L805 Series' })
+    });
+    const data = await res.json();
+    showToast(data.success ? `✅ ${size} ${data.message.includes('Landscape') ? '↔️' : '↕️'}` : '❌ Error', data.success ? 'success' : 'error');
+    updateStats();
+  } catch (err) { showToast('❌ Error', 'error'); }
+  finally { if (btn) { btn.disabled = false; btn.innerHTML = orig; } }
+}
+
+function printSelected(size) { if (selectedPhoto) printPhoto(selectedPhoto, size); }
+
+async function sharePhoto(filename) {
+  try {
+    const res = await fetch(`/api/share/${filename}`);
+    const data = await res.json();
+    document.getElementById('shareCode').textContent = data.shareCode;
+    document.getElementById('shareQR').src = data.qrURL;
+    const photo = findPhoto(filename);
+    document.getElementById('sharePreview').src = `/thumbs/${photo?.date || 'sin-fecha'}/${filename}`;
+    document.getElementById('shareURL').textContent = data.shareURL;
+    currentShareURL = data.shareURL;
+    document.getElementById('shareModal').classList.add('open');
+  } catch (err) { showToast('❌ Error', 'error'); }
+}
+
+function shareSelected() { if (selectedPhoto) sharePhoto(selectedPhoto); }
+
+async function deletePhoto(filename) {
+  try {
+    await fetch(`/api/photos/${filename}`, { method: 'DELETE' });
+    showToast('🗑️ Eliminada', '');
+    if (selectedPhoto === filename) { selectedPhoto = null; document.getElementById('actionBar').classList.remove('visible'); }
+    loadPhotos();
+  } catch (err) { showToast('❌ Error', 'error'); }
+}
+
+function deleteSelected() { if (selectedPhoto && confirm('¿Eliminar?')) deletePhoto(selectedPhoto); }
+
+function findPhoto(filename) {
+  for (const photos of Object.values(allPhotos)) {
+    const p = photos.find(x => x.filename === filename);
+    if (p) return p;
   }
+  return null;
+}
 
-  async function sharePhoto(filename) {
-    try {
-      const res = await fetch(`/api/share/${filename}`);
-      const data = await res.json();
-      document.getElementById('shareCode').textContent = data.shareCode;
-      document.getElementById('shareQR').src = data.qrURL;
-      document.getElementById('sharePreview').src = `/uploads/${filename}`;
-      document.getElementById('shareURL').textContent = data.shareURL;
-      currentShareURL = data.shareURL;
-      document.getElementById('shareModal').classList.add('open');
-    } catch (err) { showToast('❌ Error al compartir', 'error'); }
-  }
+function openPreview(filename, date) {
+  currentPreviewFile = filename;
+  // Primero mostrar thumbnail rapido, luego cargar original
+  document.getElementById('previewImg').src = `/thumbs/${date}/${filename}`;
+  document.getElementById('previewModal').classList.add('open');
+  // Cargar original en background
+  const origImg = new Image();
+  origImg.onload = () => { document.getElementById('previewImg').src = origImg.src; };
+  origImg.src = `/uploads/${date}/${filename}`;
+}
+function closePreview() { document.getElementById('previewModal').classList.remove('open'); }
+function printPreview(size) { if (currentPreviewFile) printPhoto(currentPreviewFile, size); }
+function sharePreview() { if (currentPreviewFile) { closePreview(); sharePhoto(currentPreviewFile); } }
 
-  function closeShareModal() { document.getElementById('shareModal').classList.remove('open'); }
+function closeShareModal() { document.getElementById('shareModal').classList.remove('open'); }
+function copyURL() {
+  navigator.clipboard.writeText(currentShareURL).then(() => showToast('📋 Copiado!', 'success'))
+  .catch(() => { const el = document.createElement('textarea'); el.value = currentShareURL; document.body.appendChild(el); el.select(); document.execCommand('copy'); document.body.removeChild(el); showToast('📋 Copiado!', 'success'); });
+}
 
-  function copyURL() {
-    navigator.clipboard.writeText(currentShareURL).then(() => showToast('📋 Link copiado!', 'success'))
-    .catch(() => { const el = document.createElement('textarea'); el.value = currentShareURL; document.body.appendChild(el); el.select(); document.execCommand('copy'); document.body.removeChild(el); showToast('📋 Link copiado!', 'success'); });
-  }
+async function updateStats() {
+  try {
+    const res = await fetch('/api/stats');
+    const s = await res.json();
+    document.getElementById('statsBar').textContent = `📸 ${s.totalUploaded} subidas`;
+    document.getElementById('printCount').textContent = `🖨️${s.totalPrinted} · ⬇️${s.totalDownloaded}`;
+  } catch(e) {}
+}
 
-  async function deletePhoto(filename) {
-    if (!confirm('¿Eliminar esta foto?')) return;
-    try { await fetch(`/api/photos/${filename}`, { method: 'DELETE' }); showToast('🗑️ Eliminada', ''); loadPhotos(); }
-    catch (err) { showToast('❌ Error', 'error'); }
-  }
+let lastUploadedFiles = [];
 
-  function openPreview(src) { document.getElementById('previewImg').src = src; document.getElementById('previewModal').classList.add('open'); }
-  function closePreview() { document.getElementById('previewModal').classList.remove('open'); }
+function showIndexModal(filenames) {
+  lastUploadedFiles = filenames;
+  document.getElementById('indexCount').textContent = filenames.length;
+  document.getElementById('indexModal').classList.add('open');
+  updateIndexPreview();
+}
 
-  function showToast(msg, type) {
-    const t = document.getElementById('toast'); t.textContent = msg;
-    t.className = 'toast show ' + (type || '');
-    setTimeout(() => t.classList.remove('show'), 3000);
-  }
+function updateIndexPreview() {
+  const cols = parseInt(document.getElementById('indexCols').value) || 5;
+  const rows = parseInt(document.getElementById('indexRows').value) || 7;
+  const perPage = cols * rows;
+  const pages = Math.ceil(lastUploadedFiles.length / perPage);
+  document.getElementById('indexPages').textContent = `${pages} hoja(s) — ${cols}×${rows} = ${perPage} por hoja`;
+}
 
-  loadPhotos();
-  setInterval(loadPhotos, 15000);
+function closeIndexModal() { document.getElementById('indexModal').classList.remove('open'); }
+
+async function printIndex() {
+  const cols = parseInt(document.getElementById('indexCols').value) || 5;
+  const rows = parseInt(document.getElementById('indexRows').value) || 7;
+  showToast('🖨️ Generando índice...', 'success');
+  closeIndexModal();
+  try {
+    const res = await fetch('/api/print-index', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ filenames: lastUploadedFiles, cols, rows, printer: 'EPSON L805 Series' })
+    });
+    const data = await res.json();
+    if (data.success) showToast(`✅ ${data.message}`, 'success');
+    else showToast('❌ ' + (data.error || 'Error'), 'error');
+  } catch (err) { showToast('❌ Error', 'error'); }
+}
+
+function printIndexForDate(date) {
+  const photos = [];
+  if (allPhotos[date]) allPhotos[date].forEach(p => photos.push(p.filename));
+  if (photos.length === 0) return showToast('No hay fotos', 'error');
+  showIndexModal(photos);
+}
+
+function showToast(msg, type) {
+  const t = document.getElementById('toast'); t.textContent = msg;
+  t.className = 'toast show ' + (type || '');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+loadPhotos();
+setInterval(loadPhotos, 30000);
 </script>
-
 </body>
 </html>
