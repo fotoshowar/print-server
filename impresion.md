@@ -6,7 +6,10 @@
 **Objetivo:** Automatizar la impresión de fotos compradas en FotoShow en puntos de impresión asociados  
 **Relación con FotoShow:** Servicio complementario que se integra con la plataforma de venta de fotos  
 **URL principal:** https://fotoshow.online  
-**Stack sugerido:** FastAPI (Python), PostgreSQL, WebSockets (notificaciones), API REST  
+**URL del servicio:** https://print.fotoshow.online (o subdominio a definir)  
+**Repositorio FotoShow:** https://github.com/fotoshowar/fotoshow-v2  
+**Repositorio Print Service:** https://github.com/fotoshowar/print-server  
+**Stack sugerido:** FastAPI (Python), PostgreSQL, WebSockets (notificaciones), API REST
 
 ---
 
@@ -26,7 +29,231 @@
 
 ---
 
-## 🏗️ ARQUITECTURA PROPUESTA
+## 🔄 CÓMO FOTOSHOW Y PRINT SERVICE TRABAJAN JUNTOS
+
+### Flujo completo entre ambos sistemas
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                         FOTOSHOW (fotoshow.online)                              │
+│  ┌────────────────────────────────────────────────────────────────────────────┐  │
+│  │ Frontend: gallery.html                                                    │  │
+│  │ - Cliente elige fotos                                                       │  │
+│  │ - Agrega al carrito                                                        │  │
+│  │ - Abre modal de compra                                                     │  │
+│  │ - Elige: digital + impresa                                                │  │
+│  │ - Selecciona: retiro en punto / envío a domicilio                          │  │
+│  │ - Si envío: completa dirección (calle, ciudad, CP)                          │  │
+│  └────────────────────────────────────────────────────────────────────────────┘  │
+│                                     │                                         │          │
+│  ┌────────────────────────────────────┐   │  ┌───────────────────────────────────────┐ │
+│  │ Backend: orders.py (create_order)  │   │  │ Backend: models.py (Gallery)        │ │
+│  │ - Crea Order con print_option     │   │  │ - Campos: print_enabled (bool)      │ │
+│  │ - Guarda shipping_address        │   │  │ - print_price (extra por foto)     │ │
+│  │ - Llama a Mercado Pago           │   │  │ - print_pickup_address (punto)    │ │
+│  │ - Retorna URL de checkout        │   │  │ - print_shipping_enabled (bool)   │ │
+│  └────────────────────────────────────┘   │  │ - print_shipping_price (costo)     │ │
+│                                        │   └───────────────────────────────────────┘ │
+│                                        │                                         │          │
+│  ┌────────────────────────────────────┐   │                                         │          │
+│  │ Backend: mercadopago.py (webhook)│   │                                         │          │
+│  │ - Recibe pago aprobado           │   │                                         │          │
+│  │ - Si order.print_option != "none"│   │                                         │          │
+│  │   → Enviar webhook a Print Service │←──┘                                         │          │
+│  └────────────────────────────────────┘                                             │
+└────────────────────────────────────────┬────────────────────────────────────────────────────────────┘
+                                         │
+                                         │ HTTP POST (Webhook)
+                                         │ JSON payload con order details
+                                         ↓
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                    FOTOSHOW PRINT SERVICE (print.fotoshow.online)                │
+│  ┌────────────────────────────────────────────────────────────────────────────┐  │
+│  │ API: /api/orders (POST)                                                  │  │
+│  │ - Recibe webhook desde FotoShow                                         │  │
+│  │ - Valida API key                                                       │  │
+│  │ - Crea PrintOrder en DB                                                │  │
+│  │ - Busca PrintPoint más cercano (geolocalización)                        │  │
+│  │ - Asigna orden al punto                                               │  │
+│  │ - Envia notificación WebSocket al punto                                │  │
+│  │ - Retorna 200 OK a FotoShow                                           │  │
+│  └────────────────────────────────────────────────────────────────────────────┘  │
+│  ┌────────────────────────────────────────────────────────────────────────────┐  │
+│  │ WebSocket Server                                                        │  │
+│  │ - Conecta con puntos de impresión                                     │  │
+│  │ - Push: nuevo pedido recibido                                         │  │
+│  │ - Push: actualización de estado                                       │  │
+│  └────────────────────────────────────────────────────────────────────────────┘  │
+│  ┌────────────────────────────────────────────────────────────────────────────┐  │
+│  │ API: /api/orders/{id}/status (PATCH)                                  │  │
+│  │ - Punto de impresión actualiza estado                                  │  │
+│  │ - Guarda en StatusHistory                                            │  │
+│  │ - Notifica al cliente (email/WhatsApp)                                │  │
+│  └────────────────────────────────────────────────────────────────────────────┘  │
+└────────────────────────────────────────┬────────────────────────────────────────────────────┘
+                                         │
+                                         │ WebSockets
+                                         ↓
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                    PUNTOS DE IMPRESIÓN (Imprentas asociadas)                  │
+│  ┌────────────────────────────────────────────────────────────────────────────┐  │
+│  │ Web Panel / Desktop App                                                 │  │
+│  │ - Conecta WebSocket a Print Service                                   │  │
+│  │ - Recibe notificación: nuevo pedido                                    │  │
+│  │ - Ver lista de pedidos pendientes                                      │  │
+│  │ - Descargar fotos desde URLs de FotoShow                               │  │
+│  │ - Marcar estado: printing → ready → delivered                           │  │
+│  │ - Generar etiqueta de envío (si aplica)                                │  │
+│  └────────────────────────────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 🏗️ ARQUITECTURA DETALLADA DE FOTOSHOW
+
+### Stack actual de FotoShow
+- **Backend:** FastAPI (Python 3.12)
+- **Frontend:** HTML5 + Vanilla JS (sin framework JS)
+- **Base de datos:** PostgreSQL (Supabase) con pgvector
+- **Storage:** Cloudflare R2 (S3-compatible)
+- **Autenticación:** Google OAuth + JWT
+- **Pagos:** Mercado Pago
+- **Email:** Resend
+- **IA:** InsightFace (embeddings faciales), EasyOCR (números dorsales)
+
+### Ubicación del código de FotoShow
+- **Servidor:** VPS en Vultr
+- **Directorio:** `/root/fotoshow/`
+- **Deployment:** Docker + nginx + systemd (fotoshow.service)
+- **Logs:** `journalctl -u fotoshow -f`
+
+### Estructura de archivos de FotoShow
+```
+/root/fotoshow/
+├── main.py                 # Entry point, rutas estáticas, PWA
+├── config.py               # Configuración (DB, R2, AI, Google, MP, etc.)
+├── database.py             # Session DB, init_db
+├── models.py               # SQLAlchemy models (Photographer, Gallery, Photo, Order, etc.)
+├── schemas.py              # Pydantic schemas (API request/response)
+├── ai_worker.py            # Worker IA (InsightFace + EasyOCR) - TCP server
+├── static/                 # Archivos estáticos (HTML, CSS, JS)
+│   ├── index.html          # Home
+│   ├── gallery.html        # Galería pública (carrito, compra)
+│   ├── dashboard.html      # Panel del fotógrafo
+│   ├── galleries.html     # CRUD de galerías
+│   └── clubes.html        # Landing page para clubes
+├── routers/
+│   ├── auth.py            # Google OAuth, buyer login
+│   ├── public.py          # API pública (galerías, búsqueda facial)
+│   ├── orders.py          # Creación de órdenes, checkout, reenvío
+│   ├── photos.py          # Upload de fotos, rotación, eliminación
+│   ├── mercadopago.py     # Webhook de MP, integración de pagos
+│   └── delivery.py        # Gestión de tokens de entrega
+└── services/
+    ├── ai_service.py      # Cliente HTTP/TCP para AI worker
+    ├── watermark_service.py # Generación de watermark con Pillow
+    ├── storage.py         # Abstracción de storage (S3/R2/local)
+    ├── r2_service.py      # Cloudflare R2 implementation
+    ├── mp_service.py      # Mercado Pago API
+    └── email_service.py   # Envío de emails con Resend
+```
+
+### Modelo de datos de FotoShow (relevante para impresión)
+
+**Order** - Orden de compra en FotoShow
+```python
+class Order(Base):
+    id = Column(Integer, primary_key=True)
+    photographer_id = Column(Integer, ForeignKey("photographers.id"))
+    gallery_id = Column(Integer, ForeignKey("galleries.id"))
+    buyer_email = Column(String(256))
+    buyer_name = Column(String(256))
+    buyer_phone = Column(String(32))
+    
+    # Campos de impresión (A IMPLEMENTAR)
+    print_option = Column(String(32), nullable=True)  # "none" | "pickup" | "shipping"
+    shipping_address = Column(Text, nullable=True)
+    
+    mp_preference_id = Column(String(256))
+    mp_payment_id = Column(String(256))
+    
+    status = Column(String(32))  # pending | paid | delivered | failed
+    total_amount = Column(Float)
+    platform_fee = Column(Float)
+    photographer_amount = Column(Float)
+    
+    email_sent_at = Column(DateTime, nullable=True)  # Cuando se envió email de entrega
+    created_at = Column(DateTime)
+```
+
+**Gallery** - Galería de fotos
+```python
+class Gallery(Base):
+    id = Column(Integer, primary_key=True)
+    photographer_id = Column(Integer, ForeignKey("photographers.id"))
+    name = Column(String(256))
+    price_per_photo = Column(Float)
+    status = Column(String(32))  # draft | active | inactive | private
+    
+    # Campos de impresión (A IMPLEMENTAR)
+    print_enabled = Column(Boolean, default=False)
+    print_price = Column(Float, nullable=True)  # Extra por foto impresa
+    print_pickup_address = Column(String(512), nullable=True)
+    print_shipping_enabled = Column(Boolean, default=False)
+    print_shipping_price = Column(Float, nullable=True)
+```
+
+**OrderItem** - Items de la orden
+```python
+class OrderItem(Base):
+    id = Column(Integer, primary_key=True)
+    order_id = Column(Integer, ForeignKey("orders.id"))
+    photo_id = Column(Integer, ForeignKey("photos.id"))
+    price = Column(Float)
+    
+    # Campo para impresión (A IMPLEMENTAR)
+    print_option = Column(String(32), nullable=True)
+    shipping_address = Column(Text, nullable=True)
+```
+
+### Estado actual de la opción de impresión en FotoShow
+
+**Hasta 2026-04-14:**
+- ❌ Los campos de impresión en `Gallery` NO están implementados todavía
+- ❌ Los campos de impresión en `Order` NO están implementados todavía
+- ❌ No hay webhook hacia Print Service
+- ✅ El modelo de datos de FotoShow está listo para agregar estos campos
+- ✅ El sistema de órdenes ya funciona (Mercado Pago, email de entrega)
+
+**Lo que falta implementar en FotoShow:**
+
+1. **Migración de DB** - Agregar campos a `Gallery` y `Order`:
+   - `print_enabled`, `print_price`, `print_pickup_address`, `print_shipping_enabled`, `print_shipping_price` a `Gallery`
+   - `print_option`, `shipping_address` a `Order` y `OrderItem`
+
+2. **Frontend - Crear/editar galería** - Agregar formulario de impresión:
+   - Checkbox: "Habilitar impresión"
+   - Input: "Precio extra por impresión"
+   - Input: "Dirección de retiro"
+   - Checkbox: "Ofrecer envío"
+   - Input: "Precio de envío"
+
+3. **Frontend - Carrito de compra** - Agregar opciones de impresión:
+   - Modal de carrito con selección: digital vs digital+impresa
+   - Si impresa: pickup vs shipping
+   - Si shipping: formulario de dirección
+
+4. **Backend - orders.py** - Modificar checkout para calcular total con impresión:
+   - Si `print_option != "none"`, agregar costos
+   - Guardar `print_option` y `shipping_address` en `Order`
+
+5. **Backend - mercadopago.py** - Webhook:
+   - Cuando pago aprobado y `print_option != "none"`, enviar webhook a Print Service
+
+---
+
+## 🏗️ ARQUITECTURA PROPUESTA PARA PRINT SERVICE
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
