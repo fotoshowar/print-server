@@ -1,0 +1,8 @@
+node_modules/
+uploads/
+thumbs/
+*.ps1.tmp
+print_*.ps1
+index_*.jpg
+.env
+db.json

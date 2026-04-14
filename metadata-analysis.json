@@ -1,0 +1,104 @@
+{
+  "filename": "DSC04097.JPG",
+  "usefulData": {
+    "camera": {
+      "make": "SONY",
+      "model": "ILCE-6000",
+      "software": "ILCE-6000 v3.21",
+      "lensModel": "E 18-200mm F3.5-6.3 OSS LE"
+    },
+    "capture": {
+      "dateTimeOriginal": "2014:01:01 00:00:28",
+      "exposureTime": "1/160",
+      "fNumber": 8,
+      "iso": 100,
+      "focalLength": "57.0 mm",
+      "focalLengthIn35mmFormat": "85 mm",
+      "meteringMode": "Multi-segment",
+      "flash": "Auto, Did not fire",
+      "whiteBalance": "Auto",
+      "exposureMode": "Auto",
+      "sceneCaptureType": "Standard"
+    },
+    "image": {
+      "width": 6000,
+      "height": 4000,
+      "orientation": 1,
+      "colorSpace": "sRGB",
+      "compressedBitsPerPixel": 3
+    },
+    "sony": {
+      "sonyModelID": "ILCE-6000",
+      "sonyImageWidth": 6000,
+      "sonyImageHeight": 4000,
+      "sonyImageWidthMax": 6024,
+      "sonyImageHeightMax": 4024,
+      "sonyISO": 100,
+      "sonyExposureTime": "1/144",
+      "sonyFNumber": 8.4,
+      "sonyDateTime": "2014:01:01 00:00:28",
+      "sonyDateTime2": "2014:01:01 03:00:28",
+      "extras": {
+        "SonyDateTime": {
+          "_ctor": "ExifDateTime",
+          "year": 2014,
+          "month": 1,
+          "day": 1,
+          "hour": 0,
+          "minute": 0,
+          "second": 28,
+          "tzoffsetMinutes": -180,
+          "rawValue": "2014:01:01 00:00:28",
+          "zoneName": "UTC-3",
+          "inferredZone": true
+        },
+        "SonyImageHeight": 4000,
+        "SonyImageWidth": 6000,
+        "SonyModelID": "ILCE-6000",
+        "SonyISO": 100,
+        "SonyExposureTime2": "1/144",
+        "SonyMaxApertureValue": 5.7,
+        "SonyImageWidthMax": 6024,
+        "SonyImageHeightMax": 4024,
+        "SonyExposureTime": "1/144",
+        "SonyFNumber": 8.4,
+        "SonyDateTime2": {
+          "_ctor": "ExifDateTime",
+          "year": 2014,
+          "month": 1,
+          "day": 1,
+          "hour": 3,
+          "minute": 0,
+          "second": 28,
+          "tzoffsetMinutes": -180,
+          "rawValue": "2014:01:01 03:00:28",
+          "zoneName": "UTC-3",
+          "inferredZone": true
+        }
+      }
+    },
+    "faceDetection": {
+      "facesDetected": 1,
+      "faceInfoOffset": 94,
+      "faceInfoLength": 37
+    },
+    "focus": {
+      "afAreaMode": "Multi",
+      "afAreaModeSetting": "Wide",
+      "focusMode": "AF-A"
+    },
+    "quality": {
+      "contrast": "Normal",
+      "saturation": "Normal",
+      "sharpness": "Normal",
+      "customRendered": "Normal"
+    },
+    "other": {
+      "fileModifyDate": "2014:01:01 06:00:28Z",
+      "rating": 0,
+      "brightness": 0
+    }
+  },
+  "allTagsCount": 212,
+  "facesDetected": 1
+}

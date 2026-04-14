@@ -1,0 +1,16 @@
+{
+  "filename": "DSC04100.JPG",
+  "facesDetected": 1,
+  "dateTime": "2014:01:01 00:00:40",
+  "faces": [
+    {
+      "position": "920 2288 506 506",
+      "parsed": {
+        "x": 920,
+        "y": 2288,
+        "width": 506,
+        "height": 506
+      }
+    }
+  ]
+}

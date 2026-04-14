@@ -1,0 +1,120 @@
+Su búsqueda generó 3 resultados
+
+Tipo
+
+Nombre
+
+	
+
+
+
+
+Contenido
+
+Estado de proxy
+
+TTL
+
+Acciones
+
+TXT
+_tunnel
+"a62b9fd1-9391-4c0c-b10f-311a40141d63"
+Solo DNS
+
+Automático
+EditarCuando se activa el modo abierto, se agregará una fila de tabla adicional debajo de esta fila para permitir la edición de registros DNS.
+
+CNAME
+app
+a62b9fd1-9391-4c0c-b10f-311a40141d63.cfargosocket.net
+
+Redirigido mediante proxy
+
+Automático
+EditarCuando se activa el modo abierto, se agregará una fila de tabla adicional debajo de esta fila para permitir la edición de registros DNS.
+
+CNAME
+www
+a62b9fd1-9391-4c0c-b10f-311a40141d63.cfargosocket.net
+
+Redirigido mediante proxy
+
+Automático
+EditarCuando se activa el modo abierto, se agregará una fila de tabla adicional debajo de esta fila para permitir la edición de registros DNS.
+
+
+
+
+
+a62b9fd1-9391-4c0c-b10f-311a40141d63.cfargotunnel.com
+
+
+Análisis y registros
+
+DNS
+Registros
+Analytics
+Configuración
+
+Correo electrónico
+
+SSL/TLS
+
+Seguridad
+Access
+
+Speed
+
+Almacenamiento en caché
+Rutas de Workers
+
+Reglas
+Páginas de error
+Nuevo
+Red
+
+Tráfico
+Web3
+
+Administrar cuenta
+
+Free
+DNS
+
+Registros
+Configure registros DNS y revise el estado del proxy de sus nombres de host.
+
+
+Pasos necesarios para completar la configuración de la zona
+Ocultar
+Agregue un registro MX a su dominio raíz para que el correo pueda llegar a las direcciones @fotoshow.site o configure registros SPF, DKIM y DMARC restrictivos para evitar la falsificación de correos electrónicos.
+Administración de DNS para fotoshow.site
+Permite revisar, agregar y editar registros de DNS. Las ediciones entrarán en vigor una vez guardadas.
+Configuración de DNS: Completo
+
+
+Importar y exportar
+
+
+Configuración de la pantalla del Panel de control
+Buscar registros DNS
+Su búsqueda generó 3 resultados
+
+Tipo
+
+
+
+Los registros CNAME normalmente no pueden estar en el apex de la zona. Usamos Aplanamiento CNAME para hacer que sea posible. Más información.
+
+Nombre
+
+Contenido
+
+Estado de proxy
+
+TTL
+
+Acciones
+
+Los registros CNAME normalmente no pueden estar en el apex de la zona. Usamos Aplanamiento CNAME para hacer que sea posible. Más información.

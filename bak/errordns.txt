@@ -1,0 +1,39 @@
+Su búsqueda generó 3 resultados
+
+Tipo
+
+Nombre
+
+Contenido
+
+Estado de proxy
+
+TTL
+
+Acciones
+
+TXT
+_tunnel
+"a62b9fd1-9391-4c0c-b10f-311a40141d63"
+Solo DNS
+
+Automático
+EditarCuando se activa el modo abierto, se agregará una fila de tabla adicional debajo de esta fila para permitir la edición de registros DNS.
+
+CNAME
+app
+a62b9fd1-9391-4c0c-b10f-311a40141d63.cfargosocket.net
+
+Redirigido mediante proxy
+
+Automático
+EditarCuando se activa el modo abierto, se agregará una fila de tabla adicional debajo de esta fila para permitir la edición de registros DNS.
+
+CNAME
+www
+a62b9fd1-9391-4c0c-b10f-311a40141d63.cfargosocket.net
+
+Redirigido mediante proxy
+
+Automático
+EditarCuando se activa el modo abierto, se agregará una fila de tabla adicional debajo de esta fila para permitir la edición de registros DNS.
