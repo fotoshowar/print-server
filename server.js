@@ -179,8 +179,11 @@ Write-Host "OK"
 function printWithCUPS(filepath, printerName, options = {}) {
   const { paperSize, isHorizontal } = options;
   return new Promise((resolve, reject) => {
-    let cmd = `lp -d "${printerName || DEFAULT_PRINTER}"`;
+    // Sanitizar nombre: si no es un nombre CUPS válido, usar default
+    const safeName = (printerName && /^[a-zA-Z0-9_-]+$/.test(printerName)) ? printerName : DEFAULT_PRINTER;
+    let cmd = `lp -d "${safeName}"`;
     cmd += paperSize === 'A5' ? ' -o media=a5' : ' -o media=a4';
+    cmd += ' -o MediaType=PSGLOS_HIGH';
     if (isHorizontal) cmd += ' -o landscape';
     cmd += ' -o fit-to-page';
     cmd += ` "${filepath}"`;
@@ -326,7 +329,137 @@ app.post('/api/print', async (req, res) => {
   }
 });
 
-// Imprimir con recorte personalizado (desde canvas del modal)
+// Imprimir HD — procesa el archivo original en el server (sin canvas del navegador)
+app.post('/api/print-hd', async (req, res) => {
+  const { filename, size, rotation = 0, zoom = 1, offsetX = 0, offsetY = 0, printer } = req.body;
+
+  console.log(`[PRINT-HD] Recibido: filename="${filename}", size="${size}", rotation=${rotation}, zoom=${zoom}`);
+
+  if (!filename) return res.status(400).json({ error: 'Falta filename' });
+
+  const db = loadDB();
+  const photo = db.photos[filename];
+  if (!photo) {
+    console.error(`[PRINT-HD] Foto no encontrada en BD:`, Object.keys(db.photos).slice(0, 5));
+    return res.status(404).json({ error: 'Foto no encontrada en BD' });
+  }
+
+  const date = photo.date || getToday();
+  let filepath = path.join(UPLOADS_DIR, date, filename);
+  console.log(`[PRINT-HD] Buscando archivo: ${filepath}`);
+
+  if (!fs.existsSync(filepath)) {
+    filepath = path.join(UPLOADS_DIR, filename);
+    console.log(`[PRINT-HD] Intento fallido. Buscando en ruta alternativa: ${filepath}`);
+  }
+
+  if (!fs.existsSync(filepath)) {
+    console.error(`[PRINT-HD] Archivo no encontrado:`, filepath);
+    return res.status(404).json({ error: 'Archivo no encontrado', path: filepath });
+  }
+
+  const stats = fs.statSync(filepath);
+  console.log(`[PRINT-HD] Archivo encontrado: ${filepath} (${stats.size} bytes)`);
+
+  const printSize = size || 'A4';
+  // Dimensiones de salida 300dpi: A4=2480×3508, A5=2480×1754 (mitad superior apaisada)
+  const OUT = printSize === 'A5' ? { w: 2480, h: 1754 } : { w: 2480, h: 3508 };
+  // Preview del modal: A4=200×283, A5=200×141
+  const PREVIEW_W = 200;
+  const scaleHD = OUT.w / PREVIEW_W; // 12.4
+
+  let finalPath = path.join(__dirname, `hd_${Date.now()}.jpg`);
+
+  try {
+    // 1. Auto-rotar por EXIF
+    console.log(`[PRINT-HD] 1. Leyendo con Sharp y detectando EXIF...`);
+    let imgBuf = await sharp(filepath).rotate().toBuffer();
+    console.log(`[PRINT-HD] 1. OK - Buffer generado (${imgBuf.length} bytes)`);
+
+    // 2. Rotación del usuario (si la hay)
+    if (rotation !== 0) {
+      console.log(`[PRINT-HD] 2. Aplicando rotación del usuario: ${rotation}°`);
+      imgBuf = await sharp(imgBuf)
+        .rotate(rotation, { background: { r: 255, g: 255, b: 255, alpha: 1 } })
+        .toBuffer();
+      console.log(`[PRINT-HD] 2. OK - Rotación aplicada`);
+    }
+
+    console.log(`[PRINT-HD] 3. Leyendo metadata...`);
+    const meta = await sharp(imgBuf).metadata();
+    console.log(`[PRINT-HD] 3. OK - Metadata: ${meta.width}x${meta.height} (${meta.format})`);
+
+    // 3. Escalar imagen para salida HD
+    const scaledW = Math.max(1, Math.round(meta.width * zoom * scaleHD));
+    const scaledH = Math.max(1, Math.round(meta.height * zoom * scaleHD));
+
+    const scaledBuf = await sharp(imgBuf)
+      .resize(scaledW, scaledH)
+      .toBuffer();
+
+    // 4. Posición: centro del papel + offset (escalado a HD)
+    let compLeft = Math.round(OUT.w / 2 + offsetX * scaleHD - scaledW / 2);
+    let compTop = Math.round(OUT.h / 2 + offsetY * scaleHD - scaledH / 2);
+
+    // 5. Si la imagen se sale del canvas (posiciones negativas), recortar la parte visible
+    let compBuf = scaledBuf;
+    if (compLeft < 0 || compTop < 0) {
+      const cropLeft = Math.max(0, -compLeft);
+      const cropTop = Math.max(0, -compTop);
+      const cropW = Math.min(scaledW - cropLeft, OUT.w);
+      const cropH = Math.min(scaledH - cropTop, OUT.h);
+      if (cropW > 0 && cropH > 0) {
+        compBuf = await sharp(scaledBuf)
+          .extract({ left: cropLeft, top: cropTop, width: cropW, height: cropH })
+          .toBuffer();
+      }
+      compLeft = Math.max(0, compLeft);
+      compTop = Math.max(0, compTop);
+    }
+
+    // 6. Componer sobre canvas blanco
+    await sharp({
+      create: { width: OUT.w, height: OUT.h, channels: 3, background: { r: 255, g: 255, b: 255 } }
+    })
+      .composite([{ input: compBuf, left: compLeft, top: compTop }])
+      .jpeg({ quality: 100 })
+      .toFile(finalPath);
+
+    // 7. Para A5: montar en A4 completo (mitad superior)
+    if (printSize === 'A5') {
+      const a5Buf = fs.readFileSync(finalPath);
+      await sharp({
+        create: { width: 2480, height: 3508, channels: 3, background: { r: 255, g: 255, b: 255 } }
+      })
+        .composite([{ input: a5Buf, top: 0, left: 0 }])
+        .jpeg({ quality: 100 })
+        .toFile(finalPath);
+    }
+
+    // 8. Imprimir siempre como A4 físico
+    await printFile(finalPath, printer, { paperSize: 'A4', isHorizontal: false });
+
+    const db2 = loadDB();
+    if (db2.photos[filename]) db2.photos[filename].printed++;
+    db2.stats.totalPrinted++;
+    saveDB(db2);
+
+    console.log(`[PRINT-HD] ✅ ${filename} -> ${printSize} rot=${rotation} zoom=${zoom?.toFixed(3)} (original HD)`);
+    res.json({ success: true, message: `Imprimiendo ${printSize} (calidad HD original)` });
+  } catch (err) {
+    console.error('[PRINT-HD ERROR] Excepción completa:');
+    console.error('  Mensaje:', err.message);
+    console.error('  Stack:', err.stack);
+    if (err.code) console.error('  Código:', err.code);
+    res.status(500).json({ error: 'Error al procesar imagen', detail: err.message, code: err.code });
+  } finally {
+    if (finalPath && fs.existsSync(finalPath)) {
+      try { fs.unlinkSync(finalPath); } catch(e) {}
+    }
+  }
+});
+
+// Imprimir con recorte personalizado (desde canvas del modal) — LEGACY
 // Imprimir con recorte del canvas
 app.post('/api/print-crop', async (req, res) => {
   const { filename, size, cropDataURL, printer } = req.body;
@@ -354,17 +487,31 @@ app.post('/api/print-crop', async (req, res) => {
     const ext = isPNG ? 'png' : 'jpg';
     finalPath = path.join(__dirname, `crop_${Date.now()}.${ext}`);
 
-    if (isPNG) {
-      // PNG: guardar directamente sin recodificar (calidad máxima)
-      fs.writeFileSync(finalPath, buffer);
-    } else {
-      // JPEG: procesar con máxima calidad
-      await sharp(buffer)
-        .jpeg({ quality: 100, mozjpeg: true })
+    if (printSize === 'A5') {
+      // A5 = mitad superior de A4 físico (21x~15cm, apaisado)
+      // El canvas manda 2480x1754. Lo montamos arriba de un A4 blanco (2480x3508)
+      // y mandamos a CUPS como A4 para que quede en la mitad superior.
+      const cropBuffer = isPNG ? buffer : await sharp(buffer).png().toBuffer();
+      await sharp({
+        create: { width: 2480, height: 3508, channels: 3, background: { r: 255, g: 255, b: 255 } }
+      })
+        .composite([{ input: cropBuffer, top: 0, left: 0 }])
+        .png()
         .toFile(finalPath);
-    }
 
-    await printFile(finalPath, printer, { paperSize: printSize, isHorizontal: false });
+      await printFile(finalPath, printer, { paperSize: 'A4', isHorizontal: false });
+    } else {
+      // A4: guardar y mandar directo
+      if (isPNG) {
+        fs.writeFileSync(finalPath, buffer);
+      } else {
+        await sharp(buffer)
+          .jpeg({ quality: 100, mozjpeg: true })
+          .toFile(finalPath);
+      }
+
+      await printFile(finalPath, printer, { paperSize: 'A4', isHorizontal: false });
+    }
 
     const db2 = loadDB();
     if (db2.photos[filename]) db2.photos[filename].printed++;
@@ -554,12 +701,66 @@ app.get('/api/stats', (req, res) => {
   res.json(db.stats);
 });
 
-// Listar impresoras Windows
+// Listar impresoras
 app.get('/api/printers', (req, res) => {
-  exec('powershell -NoProfile -Command "Get-Printer | Select-Object -ExpandProperty Name"', (err, stdout) => {
-    if (err) return res.json([DEFAULT_PRINTER].filter(Boolean));
-    const printers = (stdout || '').split('\n').map(l => l.trim()).filter(Boolean);
-    res.json(printers);
+  if (IS_WINDOWS) {
+    exec('powershell -NoProfile -Command "Get-Printer | Select-Object -ExpandProperty Name"', (err, stdout) => {
+      if (err) return res.json([DEFAULT_PRINTER].filter(Boolean));
+      const printers = (stdout || '').split('\n').map(l => l.trim()).filter(Boolean);
+      res.json(printers);
+    });
+  } else {
+    exec('lpstat -a 2>/dev/null', (err, stdout) => {
+      if (err) return res.json([DEFAULT_PRINTER].filter(Boolean));
+      const printers = (stdout || '').split('\n').map(l => l.split(' ')[0]).filter(Boolean);
+      res.json(printers);
+    });
+  }
+});
+
+// =================== COLA DE IMPRESIÓN ===================
+// Listar trabajos de la cola
+app.get('/api/print-queue', (req, res) => {
+  if (IS_WINDOWS) {
+    return res.json([]);
+  }
+  exec('lpstat -o 2>/dev/null', (err, stdout) => {
+    if (err || !stdout.trim()) return res.json([]);
+    const jobs = stdout.trim().split('\n').map(line => {
+      // Format: "EPSON_L805-123 user 1024 Wed 15 Apr 2026 21:18:22"
+      const match = line.match(/^(\S+)-(\d+)\s+(\S+)\s+(\d+)\s+(.+)$/);
+      if (!match) return null;
+      return { id: match[2], printer: match[1], user: match[3], size: match[4], date: match[5].trim() };
+    }).filter(Boolean);
+    res.json(jobs);
+  });
+});
+
+// Cancelar un trabajo
+app.post('/api/print-queue/cancel', (req, res) => {
+  const { jobId } = req.body;
+  if (!jobId || !/^\d+$/.test(jobId)) return res.status(400).json({ error: 'Job ID inválido' });
+  exec(`cancel ${jobId}`, (err) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true });
+  });
+});
+
+// Cancelar todos los trabajos
+app.post('/api/print-queue/cancel-all', (req, res) => {
+  exec(`cancel -a`, (err) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true });
+  });
+});
+
+// Mover un trabajo al principio de la cola (darle prioridad)
+app.post('/api/print-queue/prioritize', (req, res) => {
+  const { jobId } = req.body;
+  if (!jobId || !/^\d+$/.test(jobId)) return res.status(400).json({ error: 'Job ID inválido' });
+  exec(`lp -i ${jobId} -q 100`, (err) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true });
   });
 });
 

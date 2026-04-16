@@ -78,23 +78,6 @@
     .photo-card:hover{border-color:var(--fs-border);}
     .photo-card img{width:100%;aspect-ratio:3/4;object-fit:cover;display:block;cursor:pointer;}
     .photo-card img.horizontal{aspect-ratio:3/4;}
-    .photo-card .overlay{
-      position:absolute;bottom:0;left:0;right:0;
-      background:linear-gradient(transparent,rgba(0,0,0,0.8));
-      padding:4px 6px;display:flex;gap:3px;opacity:0;transition:opacity 0.2s;
-    }
-    .photo-card:hover .overlay{opacity:1;}
-    /* Always show on mobile */
-    @media(max-width:600px){.photo-card .overlay{opacity:1;}}
-
-    .btn-sm{
-      flex:1;padding:5px 2px;border:none;border-radius:5px;
-      font-size:0.6rem;font-weight:700;cursor:pointer;
-      font-family:'Poppins',sans-serif;text-align:center;
-    }
-    .btn-sm.print{background:rgba(173,255,47,0.2);color:var(--fs-green);}
-    .btn-sm.share{background:rgba(0,255,127,0.2);color:#00FF7F;}
-    .btn-sm.del{background:rgba(255,50,50,0.2);color:#ff6b6b;flex:0;padding:5px 6px;}
 
     /* Selected photo actions bar */
     .action-bar{
@@ -372,12 +355,6 @@ function renderAll(data) {
              onerror="this.src='/uploads/${p.date}/${p.filename}'"
              onclick="openPreview('${p.filename}','${p.date}')"
              oncontextmenu="event.preventDefault();selectPhoto('${p.filename}')">
-        <div class="overlay">
-          <button class="btn-sm print" onclick="event.stopPropagation();printPhotoDirect('${p.filename}','A4',this)">A4</button>
-          <button class="btn-sm print" onclick="event.stopPropagation();printPhotoDirect('${p.filename}','A5',this)">A5</button>
-          <button class="btn-sm print" onclick="event.stopPropagation();openPrintModal('${p.filename}','A4')">🖨️</button>
-          <button class="btn-sm share" onclick="event.stopPropagation();sharePhoto('${p.filename}')">QR</button>
-        </div>
       </div>`;
     }
     html += '</div>';
@@ -576,40 +553,26 @@ function closePrintModal() {
 })();
 
 async function confirmPrint() {
-  if (!pm.filename || !pm.img) return;
-  const filename = pm.filename;
+  if (!pm.filename) return;
   const fmt = pm.format;
-  const displayDim = PAPER_PX[fmt];
-
-  // Dimensiones HD de salida (300dpi): A4=2480×3508, A5=mitad superior=2480×1754
-  const OUT = fmt === 'A5' ? { w: 2480, h: 1754 } : { w: 2480, h: 3508 };
-  const scaleHD = OUT.w / displayDim.w;
-
-  // Renderizar canvas HD con el mismo transform que el preview
-  const hdCanvas = document.createElement('canvas');
-  hdCanvas.width = OUT.w;
-  hdCanvas.height = OUT.h;
-  const ctx = hdCanvas.getContext('2d');
-  ctx.fillStyle = '#fff';
-  ctx.fillRect(0, 0, OUT.w, OUT.h);
-  ctx.save();
-  ctx.translate(OUT.w / 2 + pm.offsetX * scaleHD, OUT.h / 2 + pm.offsetY * scaleHD);
-  ctx.rotate(pm.rotation * Math.PI / 180);
-  ctx.scale(pm.zoom * scaleHD, pm.zoom * scaleHD);
-  ctx.drawImage(pm.img, -pm.img.naturalWidth / 2, -pm.img.naturalHeight / 2);
-  ctx.restore();
-
-  const cropDataURL = hdCanvas.toDataURL('image/png'); // PNG sin pérdida de calidad
   closePrintModal();
-  showToast('🖨️ Enviando...', '');
+  showToast('🖨️ Enviando HD...', '');
   try {
-    const res = await fetch('/api/print-crop', {
+    const res = await fetch('/api/print-hd', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ filename, size: fmt, cropDataURL, printer: 'EPSON L805 Series' })
+      body: JSON.stringify({
+        filename: pm.filename,
+        size: fmt,
+        rotation: pm.rotation,
+        zoom: pm.zoom,
+        offsetX: pm.offsetX,
+        offsetY: pm.offsetY,
+        printer: 'EPSON L805 Series'
+      })
     });
     const data = await res.json();
-    showToast(data.success ? `✅ Imprimiendo en ${fmt}` : '❌ ' + (data.error || 'Error'), data.success ? 'success' : 'error');
+    showToast(data.success ? `✅ ${data.message}` : '❌ ' + (data.error || 'Error'), data.success ? 'success' : 'error');
     updateStats();
   } catch (err) { showToast('❌ Error de red', 'error'); }
 }

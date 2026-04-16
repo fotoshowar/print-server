@@ -1,0 +1,5 @@
+- [User Profile](user_profile.md) — Basito, founder of FotoShow, communicates in Spanish
+- [FotoShow Architecture](architecture_fotoshow.md) — Complete ecosystem: marketplace + digital lab + distributed printing network
+- [Print Server RPi](project_print_server.md) — FastAPI print server on Raspberry Pi, EPSON L805, exposed at fotoshow.site via Cloudflare tunnel
+- [FotoShow Main](project_fotoshow_main.md) — Main platform on VPS Vultr, FastAPI + AI facial search, fotoshow.online
+- [Darkroom Lab](project_darkroom.md) — Digital photography lab on VPS, photo composition + editing (Darktable presets)

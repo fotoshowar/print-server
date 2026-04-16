@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+pydantic-settings
+sqlalchemy
+httpx
+pillow
+reportlab
+python-dotenv
+aiosqlite
+pyjwt
