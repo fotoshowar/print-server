@@ -49,72 +49,19 @@ async def list_galleries(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/gallery/{gallery_id}", response_model=GalleryOut)
-async def get_gallery(
-    gallery_id: int,
-    db: AsyncSession = Depends(get_db),
-    jwt_token: Optional[str] = Depends(get_jwt_token),
-):
+@router.get("/gallery/{gallery_id}")
+async def get_gallery(gallery_id: int):
     """
-    Obtiene detalle de una galería específica con sus fotos
-
-    Sincroniza fotos nuevas desde fotoshow-v2
+    Obtiene fotos de una galería desde fotoshow.online
+    Temporalmente sin autenticación para development
     """
     try:
-        # Obtener de DB local
-        result = await db.execute(
-            select(Gallery).where(Gallery.fotoshow_gallery_id == gallery_id)
-        )
-        gallery = result.scalar_one_or_none()
-
-        if not gallery:
-            # Intentar obtener desde fotoshow-v2
-            client = await get_client_with_token(jwt_token)
-            gal_data = await client.get_gallery_photos(gallery_id)
-
-            # Sincronizar
-            gallery = await _sync_gallery(db, gal_data)
-
-        if not gallery:
-            raise HTTPException(status_code=404, detail="Gallery not found")
-
-        # Sincronizar fotos si es necesario
-        await _sync_gallery_photos(db, gallery, jwt_token)
-
-        # Retornar
-        return GalleryOut(
-            id=gallery.id,
-            fotoshow_gallery_id=gallery.fotoshow_gallery_id,
-            name=gallery.name,
-            description=gallery.description,
-            location=gallery.location,
-            event_date=gallery.event_date,
-            price_per_photo=gallery.price_per_photo,
-            photo_count=gallery.photo_count,
-            synced_photo_count=len(gallery.photos),
-            last_sync_at=gallery.last_sync_at,
-            created_at=gallery.created_at,
-            photos=[
-                PhotoOut(
-                    id=p.id,
-                    fotoshow_photo_id=p.fotoshow_photo_id,
-                    gallery_id=p.gallery_id,
-                    filename=p.filename,
-                    width=p.width,
-                    height=p.height,
-                    faces_detected=p.faces_detected,
-                    local_path=p.local_path,
-                    thumbnail_url=None,
-                    sync_status=p.sync_status.value,
-                    print_count=p.print_count,
-                    created_at=p.created_at,
-                )
-                for p in gallery.photos
-            ]
-        )
-
+        client = await get_client_with_token("")
+        gal_data = await client.get_gallery_photos(gallery_id)
+        log.info(f"✅ Fetched {len(gal_data.get('photos', []))} photos for gallery {gallery_id}")
+        return gal_data
     except Exception as e:
-        log.error(f"Error getting gallery: {e}")
+        log.error(f"Error getting gallery {gallery_id}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 

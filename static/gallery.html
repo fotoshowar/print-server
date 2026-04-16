@@ -367,7 +367,7 @@
             try {
                 showLoading(true);
 
-                const response = await fetch(`/api/galleries/${galleryId}`, {
+                const response = await fetch(`/api/gallery/${galleryId}`, {
                     headers: {
                         'Cookie': `fotoshow_token=${authToken}`
                     }

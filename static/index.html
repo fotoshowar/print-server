@@ -269,12 +269,9 @@
 
   // Inicializar
   document.addEventListener('DOMContentLoaded', () => {
-    if (authToken) {
-      showGalleries();
-      loadGalleries();
-    } else {
-      showLogin();
-    }
+    // DEVELOPMENT: Skip login for testing
+    showGalleries();
+    loadGalleries();
   });
 
   function showLogin() {
