@@ -1,6 +1,6 @@
 /**
- * FotoShow Print Server — Linux/Raspberry Pi version
- * Usa CUPS para imprimir en vez de PowerShell
+ * FotoShow Print Server — Windows version
+ * Usa PowerShell / mspaint para imprimir
  */
 require('dotenv').config();
 const express = require('express');
@@ -24,7 +24,7 @@ fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 fs.mkdirSync(THUMBS_DIR, { recursive: true });
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '20mb' }));
 app.use(express.static('public'));
 
 // =================== DB ===================
@@ -111,48 +111,98 @@ async function generateThumbnail(originalPath, filename, date) {
   }
 }
 
-// Detectar impresora CUPS
-function getDefaultPrinter() {
-  return new Promise((resolve) => {
-    if (DEFAULT_PRINTER) return resolve(DEFAULT_PRINTER);
-    exec('lpstat -d 2>/dev/null', (err, stdout) => {
-      const match = stdout && stdout.match(/system default destination: (.+)/);
-      resolve(match ? match[1].trim() : '');
+// =================== IMPRESIÓN (auto Windows / Linux) ===================
+const IS_WINDOWS = process.platform === 'win32';
+console.log(`[INIT] Sistema operativo: ${IS_WINDOWS ? 'Windows' : 'Linux/Pi'}`);
+
+// Windows: PowerShell + PrintDocument
+function printWithPS(filepath, printerName, options = {}) {
+  const { paperSize, isHorizontal } = options;
+  const printer = printerName || DEFAULT_PRINTER;
+  const size = paperSize || 'A4';
+
+  // Siempre A4 físico. A5 = mitad superior de A4.
+  // A4 en centésimas de pulgada: 827 x 1169
+  // Margen 0.5cm ≈ 20 centésimas de pulgada
+  const isA5 = size === 'A5';
+
+  // Para A5: área de dibujo = mitad superior del A4 con margen
+  // mitad de 1169 = 584
+  const psScript = `
+Add-Type -AssemblyName System.Drawing
+$img = [System.Drawing.Image]::FromFile('${filepath.replace(/\\/g, '\\\\')}')
+$pd = New-Object System.Drawing.Printing.PrintDocument
+$pd.PrinterSettings.PrinterName = '${printer}'
+$a4 = $pd.PrinterSettings.PaperSizes | Where-Object { $_.Kind -eq 'A4' -or $_.PaperName -match 'A4' } | Select-Object -First 1
+if ($a4) { $pd.DefaultPageSettings.PaperSize = $a4 } else { $pd.DefaultPageSettings.PaperSize = New-Object System.Drawing.Printing.PaperSize('A4', 827, 1169) }
+$bestRes = $pd.PrinterSettings.PrinterResolutions | Sort-Object -Property Y -Descending | Select-Object -First 1
+if ($bestRes) { $pd.DefaultPageSettings.PrinterResolution = $bestRes }
+$pd.OriginAtMargins = $false
+$pd.add_PrintPage({
+  param($sender, $e)
+  $e.Graphics.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
+  $e.Graphics.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::HighQuality
+  $e.Graphics.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::HighQuality
+  $e.Graphics.CompositingQuality = [System.Drawing.Drawing2D.CompositingQuality]::HighQuality
+  $pw = $e.PageBounds.Width
+  $ph = $e.PageBounds.Height
+  $margin = 20
+  ${isA5 ? `# A5: solo mitad superior de la hoja A4
+  $areaW = $pw - ($margin * 2)
+  $areaH = [int]($ph / 2) - ($margin * 2)
+  $originX = $margin
+  $originY = $margin` : `# A4: hoja completa
+  $areaW = $pw - ($margin * 2)
+  $areaH = $ph - ($margin * 2)
+  $originX = $margin
+  $originY = $margin`}
+  $sw = $areaW / $img.Width
+  $sh = $areaH / $img.Height
+  $scale = [Math]::Min($sw, $sh)
+  $fw = [int]($img.Width * $scale)
+  $fh = [int]($img.Height * $scale)
+  $x = $originX + [int](($areaW - $fw) / 2)
+  $y = $originY + [int](($areaH - $fh) / 2)
+  $e.Graphics.DrawImage($img, $x, $y, $fw, $fh)
+  $e.HasMorePages = $false
+})
+$pd.Print()
+$img.Dispose()
+Write-Host "OK"
+`;
+
+  const tempScript = path.join(__dirname, `print_${Date.now()}.ps1`);
+  fs.writeFileSync(tempScript, psScript);
+
+  return new Promise((resolve, reject) => {
+    exec(`powershell -ExecutionPolicy Bypass -File "${tempScript}"`, { timeout: 30000 }, (error, stdout, stderr) => {
+      try { fs.unlinkSync(tempScript); } catch(e) {}
+      if (error) reject(new Error(stderr || error.message));
+      else resolve(stdout.trim());
     });
   });
 }
 
-// Imprimir con CUPS (lp)
-async function printWithCUPS(filepath, printerName, options = {}) {
-  const printer = printerName || await getDefaultPrinter();
-  if (!printer) throw new Error('No hay impresora configurada');
-
-  const { landscape, paperSize } = options;
-  let cmd = `lp -d "${printer}"`;
-
-  // Opciones de papel
-  if (paperSize === 'A5') {
-    cmd += ' -o media=a5';
-  } else {
-    cmd += ' -o media=a4';
-  }
-
-  // Orientación
-  if (landscape) {
-    cmd += ' -o landscape';
-  }
-
-  // Ajustar a página
-  cmd += ' -o fit-to-page';
-
-  cmd += ` "${filepath}"`;
-
+// Linux/Pi: CUPS (lp)
+function printWithCUPS(filepath, printerName, options = {}) {
+  const { paperSize, isHorizontal } = options;
   return new Promise((resolve, reject) => {
+    let cmd = `lp -d "${printerName || DEFAULT_PRINTER}"`;
+    cmd += paperSize === 'A5' ? ' -o media=a5' : ' -o media=a4';
+    if (isHorizontal) cmd += ' -o landscape';
+    cmd += ' -o fit-to-page';
+    cmd += ` "${filepath}"`;
     exec(cmd, (error, stdout, stderr) => {
       if (error) reject(new Error(stderr || error.message));
       else resolve(stdout.trim());
     });
   });
+}
+
+// Función unificada — elige según SO automáticamente
+function printFile(filepath, printerName, options = {}) {
+  if (IS_WINDOWS) return printWithPS(filepath, printerName, options);
+  return printWithCUPS(filepath, printerName, options);
 }
 
 // =================== RUTAS API ===================
@@ -270,10 +320,7 @@ app.post('/api/print', async (req, res) => {
   console.log(`[PRINT] ${filename} -> ${printer || 'default'} (${printSize} ${orientation})`);
 
   try {
-    const result = await printWithCUPS(filepath, printer, {
-      landscape: isHorizontal,
-      paperSize: printSize
-    });
+    await printFile(filepath, printer, { paperSize: printSize, isHorizontal });
 
     const db2 = loadDB();
     if (db2.photos[filename]) db2.photos[filename].printed++;
@@ -284,6 +331,50 @@ app.post('/api/print', async (req, res) => {
   } catch (err) {
     console.error('[PRINT ERROR]', err.message);
     res.status(500).json({ error: 'Error al imprimir', detail: err.message });
+  }
+});
+
+// Imprimir con recorte personalizado (desde canvas del modal)
+// Imprimir con recorte del canvas
+app.post('/api/print-crop', async (req, res) => {
+  const { filename, size, cropDataURL, printer } = req.body;
+  if (!filename || !cropDataURL) return res.status(400).json({ error: 'Faltan datos' });
+
+  const db = loadDB();
+  const photo = db.photos[filename];
+  if (!photo) return res.status(404).json({ error: 'Foto no encontrada' });
+
+  const date = photo.date || getToday();
+  let origPath = path.join(UPLOADS_DIR, date, filename);
+  if (!fs.existsSync(origPath)) origPath = path.join(UPLOADS_DIR, filename);
+  if (!fs.existsSync(origPath)) return res.status(404).json({ error: 'Archivo no encontrado' });
+
+  const printSize = size || 'A4';
+  const tmpPath = path.join(__dirname, `crop_${Date.now()}.jpg`);
+
+  try {
+    // Decodificar el canvas y mandarlo directo a imprimir
+    const base64 = cropDataURL.replace(/^data:image\/\w+;base64,/, '');
+    const buffer = Buffer.from(base64, 'base64');
+
+    await sharp(buffer)
+      .jpeg({ quality: 95 })
+      .toFile(tmpPath);
+
+    await printFile(tmpPath, printer, { paperSize: printSize, isHorizontal: false });
+
+    const db2 = loadDB();
+    if (db2.photos[filename]) db2.photos[filename].printed++;
+    db2.stats.totalPrinted++;
+    saveDB(db2);
+
+    console.log(`[PRINT-CROP] ${filename} -> ${printSize}`);
+    res.json({ success: true, message: `Enviado (${printSize})` });
+  } catch (err) {
+    console.error('[PRINT-CROP ERROR]', err.message);
+    res.status(500).json({ error: 'Error al imprimir', detail: err.message });
+  } finally {
+    try { fs.unlinkSync(tmpPath); } catch(e) {}
   }
 });
 
@@ -371,10 +462,9 @@ app.post('/api/print-index', async (req, res) => {
       indexPaths.push(pagePath);
     }
 
-    // Imprimir con CUPS
     for (const indexPath of indexPaths) {
       try {
-        await printWithCUPS(indexPath, printer, { paperSize: 'A4' });
+        await printFile(indexPath, printer, { paperSize: 'A4' });
       } catch (e) {
         console.error('[INDEX PRINT ERROR]', e.message);
       }
@@ -459,16 +549,21 @@ app.get('/api/stats', (req, res) => {
   res.json(db.stats);
 });
 
-// Listar impresoras CUPS
+// Listar impresoras Windows
 app.get('/api/printers', (req, res) => {
-  exec('lpstat -p 2>/dev/null', (err, stdout) => {
-    if (err) return res.json([]);
-    const printers = [];
-    for (const line of stdout.split('\n')) {
-      const match = line.match(/^printer (\S+)/);
-      if (match) printers.push(match[1]);
+  const cmd = 'powershell -NoProfile -Command "Get-Printer | Select-Object Name,Default | ConvertTo-Json -Compress"';
+  exec(cmd, (err, stdout) => {
+    if (err) return res.json({ printers: [DEFAULT_PRINTER].filter(Boolean), default: DEFAULT_PRINTER });
+    try {
+      const raw = JSON.parse(stdout.trim());
+      const list = Array.isArray(raw) ? raw : [raw];
+      const printers = list.map(p => p.Name).filter(Boolean);
+      const def = (list.find(p => p.Default) || {}).Name || DEFAULT_PRINTER || printers[0] || '';
+      res.json({ printers, default: def });
+    } catch(e) {
+      const printers = (stdout || '').split('\n').map(l => l.trim()).filter(Boolean);
+      res.json({ printers, default: DEFAULT_PRINTER || printers[0] || '' });
     }
-    res.json(printers);
   });
 });
 
@@ -476,12 +571,90 @@ app.get('/api/printers', (req, res) => {
 app.use('/thumbs', express.static(THUMBS_DIR, { maxAge: '1h' }));
 app.use('/uploads', (req, res, next) => { res.set('Cache-Control', 'no-store'); next(); }, express.static(UPLOADS_DIR));
 
+// =================== WATCHER RPI ===================
+const RPI_FOTOS_PATH = process.env.RPI_FOTOS_PATH || '';
+const RPI_POLL_MS = parseInt(process.env.RPI_POLL_MS || '8000');
+const WATCH_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png']);
+
+async function importFromRpi() {
+  if (!RPI_FOTOS_PATH) return;
+
+  const today = getToday();
+  const watchPath = path.join(RPI_FOTOS_PATH, today);
+
+  let files;
+  try {
+    files = fs.readdirSync(watchPath);
+  } catch (e) {
+    return; // RPi no conectada o carpeta inexistente — silencioso
+  }
+
+  const db = loadDB();
+  const alreadyImported = new Set(
+    Object.values(db.photos)
+      .filter(p => p.date === today && p.source === 'rpi')
+      .map(p => p.originalName)
+  );
+
+  const newFiles = files.filter(f =>
+    WATCH_EXTENSIONS.has(path.extname(f).toLowerCase()) && !alreadyImported.has(f)
+  );
+
+  if (newFiles.length === 0) return;
+
+  console.log(`[RPI] ${newFiles.length} foto(s) nueva(s) en ${watchPath}`);
+  const dayDir = path.join(UPLOADS_DIR, today);
+  fs.mkdirSync(dayDir, { recursive: true });
+
+  for (const file of newFiles) {
+    const srcPath = path.join(watchPath, file);
+    const ts = Date.now();
+    const ext = path.extname(file).toLowerCase() || '.jpg';
+    const destFilename = `foto-${ts}${ext}`;
+    const destPath = path.join(dayDir, destFilename);
+
+    try {
+      fs.copyFileSync(srcPath, destPath);
+      const thumbInfo = await generateThumbnail(destPath, destFilename, today);
+
+      const freshDb = loadDB();
+      freshDb.photos[destFilename] = {
+        filename: destFilename,
+        originalName: file,
+        date: today,
+        size: fs.statSync(destPath).size,
+        thumbSize: thumbInfo.size,
+        width: thumbInfo.width,
+        height: thumbInfo.height,
+        isHorizontal: thumbInfo.isHorizontal,
+        shareCode: generateShareCode(),
+        uploadedAt: new Date().toISOString(),
+        printed: 0,
+        downloaded: 0,
+        source: 'rpi'
+      };
+      freshDb.stats.totalUploaded++;
+      saveDB(freshDb);
+
+      console.log(`[RPI] Importada: ${file} -> ${destFilename}`);
+    } catch (e) {
+      console.error(`[RPI] Error importando ${file}:`, e.message);
+    }
+  }
+}
+
 // =================== INICIAR ===================
 app.listen(PORT, '0.0.0.0', () => {
   const localIP = getLocalIP();
-  console.log(`\n🖨️  FotoShow Print Server v3.0 (Linux)`);
+  console.log(`\n🖨️  FotoShow Print Server v3.0 (Windows)`);
   console.log(`   Local:    http://localhost:${PORT}`);
   console.log(`   Red:      http://${localIP}:${PORT}`);
   console.log(`   Internet: https://${PUBLIC_DOMAIN}`);
   console.log(`\n   📸 Abrí http://${localIP}:${PORT} desde tu celular!\n`);
+
+  if (RPI_FOTOS_PATH) {
+    console.log(`[RPI] Vigilando ${RPI_FOTOS_PATH}\\<fecha> cada ${RPI_POLL_MS / 1000}s`);
+    importFromRpi();
+    setInterval(importFromRpi, RPI_POLL_MS);
+  }
 });

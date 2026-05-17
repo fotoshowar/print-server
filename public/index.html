@@ -146,6 +146,14 @@
     .spinner{display:inline-block;width:14px;height:14px;border:2px solid rgba(173,255,47,0.3);border-top-color:var(--fs-green);border-radius:50%;animation:spin 0.7s linear infinite;}
     @keyframes spin{to{transform:rotate(360deg);}}
     .badge-fs{font-size:0.6rem;background:rgba(173,255,47,0.1);padding:2px 6px;border-radius:5px;color:var(--fs-green);border:1px solid rgba(173,255,47,0.2);}
+
+    /* Print Config Modal */
+    .fmt-tab{flex:1;padding:8px 4px;border:1px solid var(--fs-border);border-radius:8px;background:var(--fs-bg-card-2);color:var(--fs-text-muted);font-size:0.78rem;font-weight:600;cursor:pointer;font-family:'Poppins',sans-serif;transition:all 0.2s;}
+    .fmt-tab.active{background:rgba(173,255,47,0.15);color:var(--fs-green);border-color:var(--fs-green);}
+    .ctrl-btn{padding:8px 10px;border:1px solid var(--fs-border);border-radius:8px;background:var(--fs-bg-card-2);color:var(--fs-text);font-size:0.78rem;font-weight:600;cursor:pointer;font-family:'Poppins',sans-serif;white-space:nowrap;}
+    .paper-frame{position:relative;overflow:hidden;background:white;border-radius:3px;box-shadow:0 6px 28px rgba(0,0,0,0.7),0 0 0 1px rgba(255,255,255,0.08);margin:0 auto;cursor:grab;touch-action:none;flex-shrink:0;}
+    .paper-frame:active{cursor:grabbing;}
+    .zoom-range{flex:1;accent-color:var(--fs-green);height:4px;}
   </style>
 </head>
 <body>
@@ -245,6 +253,42 @@
     <div id="indexPreviewContainer" style="background:white;border-radius:8px;padding:6px;margin-bottom:10px;max-height:50vh;overflow-y:auto;"></div>
     <button onclick="printIndex()" style="background:var(--fs-green);color:#0a0a0a;border:none;border-radius:10px;padding:12px 24px;font-size:1rem;font-weight:700;cursor:pointer;width:100%;font-family:'Poppins',sans-serif;">🖨️ Imprimir Índice</button>
     <button class="modal-close" onclick="closeIndexModal()" style="margin-top:8px;">Cancelar</button>
+  </div>
+</div>
+
+<!-- Print Config Modal -->
+<div class="modal" id="printModal" onclick="if(event.target===this)closePrintModal()">
+  <div class="modal-content" style="max-width:360px;padding:16px;">
+    <h3 style="margin-bottom:12px;">🖨️ Configurar impresión</h3>
+
+    <!-- Formato -->
+    <div style="display:flex;gap:8px;margin-bottom:12px;">
+      <button class="fmt-tab active" id="tabA4" onclick="setPrintFormat('A4')">📄 A4 completo</button>
+      <button class="fmt-tab" id="tabA5" onclick="setPrintFormat('A5')">📋 Media hoja A5</button>
+    </div>
+
+    <!-- Canvas de previsualización -->
+    <div style="display:flex;justify-content:center;margin-bottom:10px;">
+      <div class="paper-frame" id="paperFrame">
+        <canvas id="cropCanvas"></canvas>
+      </div>
+    </div>
+
+    <!-- Controles -->
+    <div style="display:flex;gap:6px;align-items:center;margin-bottom:8px;">
+      <button class="ctrl-btn" onclick="rotatePrint(-90)">↺ -90°</button>
+      <button class="ctrl-btn" onclick="rotatePrint(90)">↻ +90°</button>
+      <button class="ctrl-btn" onclick="resetPrintTransform()">⟳ Reset</button>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;">
+      <span style="font-size:0.72rem;color:var(--fs-text-muted);">Zoom</span>
+      <input type="range" class="zoom-range" id="zoomRange" min="0.5" max="4" step="0.05" value="1" oninput="setZoom(parseFloat(this.value))">
+      <span style="font-size:0.72rem;color:var(--fs-text-muted);min-width:36px;" id="zoomLabel">100%</span>
+    </div>
+    <p style="font-size:0.7rem;color:var(--fs-text-muted);margin-bottom:10px;text-align:center;">Arrastrá para reencuadrar · Pellizco para zoom</p>
+
+    <button onclick="confirmPrint()" style="background:var(--fs-green);color:#0a0a0a;border:none;border-radius:10px;padding:12px;font-size:0.95rem;font-weight:700;cursor:pointer;width:100%;font-family:'Poppins',sans-serif;">🖨️ Imprimir</button>
+    <button class="modal-close" onclick="closePrintModal()" style="margin-top:8px;width:100%;">Cancelar</button>
   </div>
 </div>
 
@@ -365,22 +409,212 @@ function selectPhoto(filename) {
   if (card) card.classList.toggle('selected', selectedPhoto === filename);
 }
 
-async function printPhoto(filename, size, btn) {
-  const orig = btn ? btn.innerHTML : '';
-  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>'; }
-  try {
-    const res = await fetch('/api/print', {
-      method: 'POST', headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ filename, size, printer: 'EPSON L805 Series' })
-    });
-    const data = await res.json();
-    showToast(data.success ? `✅ ${size} ${data.message.includes('Landscape') ? '↔️' : '↕️'}` : '❌ Error', data.success ? 'success' : 'error');
-    updateStats();
-  } catch (err) { showToast('❌ Error', 'error'); }
-  finally { if (btn) { btn.disabled = false; btn.innerHTML = orig; } }
+// ---- PRINT MODAL ----
+let pm = {
+  filename: null, format: 'A4',
+  rotation: 0, zoom: 1,
+  offsetX: 0, offsetY: 0,
+  dragging: false, lastX: 0, lastY: 0,
+  pinchDist: null, pinchZoom: 1,
+  img: null
+};
+
+const PAPER_PX = { A4: { w: 200, h: 283 }, A5: { w: 200, h: 141 } };
+
+function openPrintModal(filename, defaultFormat) {
+  pm.filename = filename;
+  pm.format = defaultFormat || 'A4';
+  pm.rotation = 0; pm.zoom = 1; pm.offsetX = 0; pm.offsetY = 0;
+  pm.img = null;
+  document.getElementById('zoomRange').value = 1;
+  document.getElementById('zoomLabel').textContent = '100%';
+  setPrintFormat(pm.format);
+  document.getElementById('printModal').classList.add('open');
+  loadPrintImage(filename);
 }
 
-function printSelected(size) { if (selectedPhoto) printPhoto(selectedPhoto, size); }
+function loadPrintImage(filename) {
+  const photo = findPhoto(filename);
+  if (!photo) return;
+  pm.origReady = false;
+
+  // Mostrar thumb rápido para preview
+  const thumb = new Image();
+  thumb.onload = () => { pm.img = thumb; fitImageToFrame(); renderCrop(); };
+  thumb.src = `/thumbs/${photo.date}/${filename}`;
+
+  // Cargar original en background — marca cuando está lista
+  const orig = new Image();
+  orig.crossOrigin = 'anonymous';
+  orig.onload = () => { pm.img = orig; pm.origReady = true; renderCrop(); };
+  orig.onerror = () => { pm.origReady = true; }; // si falla, usa thumb
+  orig.src = `/uploads/${photo.date}/${filename}`;
+  pm._origImg = orig; // guardar referencia para forzar carga
+}
+
+function setPrintFormat(fmt) {
+  pm.format = fmt;
+  document.getElementById('tabA4').classList.toggle('active', fmt === 'A4');
+  document.getElementById('tabA5').classList.toggle('active', fmt === 'A5');
+  const dim = PAPER_PX[fmt];
+  const frame = document.getElementById('paperFrame');
+  const canvas = document.getElementById('cropCanvas');
+  frame.style.width = dim.w + 'px';
+  frame.style.height = dim.h + 'px';
+  canvas.width = dim.w;
+  canvas.height = dim.h;
+  pm.offsetX = 0; pm.offsetY = 0;
+  if (pm.img) { fitImageToFrame(); renderCrop(); }
+}
+
+function fitImageToFrame() {
+  if (!pm.img) return;
+  const dim = PAPER_PX[pm.format];
+  const rad = pm.rotation * Math.PI / 180;
+  const cos = Math.abs(Math.cos(rad)), sin = Math.abs(Math.sin(rad));
+  const rw = pm.img.naturalWidth * cos + pm.img.naturalHeight * sin;
+  const rh = pm.img.naturalWidth * sin + pm.img.naturalHeight * cos;
+  const scale = Math.max(dim.w / rw, dim.h / rh);
+  pm.zoom = scale;
+  pm.offsetX = 0; pm.offsetY = 0;
+  const sliderVal = Math.min(4, Math.max(0.5, scale));
+  document.getElementById('zoomRange').value = sliderVal;
+  document.getElementById('zoomLabel').textContent = Math.round(scale * 100) + '%';
+}
+
+function renderCrop() {
+  const canvas = document.getElementById('cropCanvas');
+  const ctx = canvas.getContext('2d');
+  const dim = PAPER_PX[pm.format];
+  ctx.clearRect(0, 0, dim.w, dim.h);
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, dim.w, dim.h);
+  if (!pm.img) return;
+  ctx.save();
+  ctx.translate(dim.w / 2 + pm.offsetX, dim.h / 2 + pm.offsetY);
+  ctx.rotate(pm.rotation * Math.PI / 180);
+  ctx.scale(pm.zoom, pm.zoom);
+  ctx.drawImage(pm.img, -pm.img.naturalWidth / 2, -pm.img.naturalHeight / 2);
+  ctx.restore();
+}
+
+function rotatePrint(deg) {
+  pm.rotation = (pm.rotation + deg + 360) % 360;
+  fitImageToFrame();
+  renderCrop();
+}
+
+function setZoom(v) {
+  pm.zoom = v;
+  document.getElementById('zoomLabel').textContent = Math.round(v * 100) + '%';
+  renderCrop();
+}
+
+function resetPrintTransform() {
+  pm.rotation = 0; pm.offsetX = 0; pm.offsetY = 0;
+  fitImageToFrame();
+  renderCrop();
+}
+
+function closePrintModal() {
+  document.getElementById('printModal').classList.remove('open');
+  pm.img = null; pm.filename = null;
+}
+
+// Drag con mouse
+(function() {
+  function onCanvas(e) { return e.target === document.getElementById('cropCanvas'); }
+
+  document.addEventListener('mousedown', e => {
+    if (!onCanvas(e)) return;
+    pm.dragging = true; pm.lastX = e.clientX; pm.lastY = e.clientY;
+    e.preventDefault();
+  });
+  document.addEventListener('mousemove', e => {
+    if (!pm.dragging) return;
+    pm.offsetX += e.clientX - pm.lastX;
+    pm.offsetY += e.clientY - pm.lastY;
+    pm.lastX = e.clientX; pm.lastY = e.clientY;
+    renderCrop();
+  });
+  document.addEventListener('mouseup', () => { pm.dragging = false; });
+
+  // Touch drag + pinch
+  document.addEventListener('touchstart', e => {
+    if (!onCanvas(e)) return;
+    if (e.touches.length === 1) {
+      pm.dragging = true; pm.pinchDist = null;
+      pm.lastX = e.touches[0].clientX; pm.lastY = e.touches[0].clientY;
+    } else if (e.touches.length === 2) {
+      pm.dragging = false;
+      pm.pinchDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+      pm.pinchZoom = pm.zoom;
+    }
+    e.preventDefault();
+  }, { passive: false });
+
+  document.addEventListener('touchmove', e => {
+    if (!onCanvas(e)) return;
+    if (e.touches.length === 1 && pm.dragging) {
+      pm.offsetX += e.touches[0].clientX - pm.lastX;
+      pm.offsetY += e.touches[0].clientY - pm.lastY;
+      pm.lastX = e.touches[0].clientX; pm.lastY = e.touches[0].clientY;
+      renderCrop();
+    } else if (e.touches.length === 2 && pm.pinchDist !== null) {
+      const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+      const nz = Math.min(4, Math.max(0.5, pm.pinchZoom * (d / pm.pinchDist)));
+      pm.zoom = nz;
+      document.getElementById('zoomRange').value = nz;
+      document.getElementById('zoomLabel').textContent = Math.round(nz * 100) + '%';
+      renderCrop();
+    }
+    e.preventDefault();
+  }, { passive: false });
+
+  document.addEventListener('touchend', () => { pm.dragging = false; pm.pinchDist = null; });
+})();
+
+async function confirmPrint() {
+  if (!pm.filename || !pm.img) return;
+  const filename = pm.filename;
+  const fmt = pm.format;
+  const displayDim = PAPER_PX[fmt];
+
+  // Dimensiones HD de salida (300dpi): A4=2480×3508, A5=mitad superior=2480×1754
+  const OUT = fmt === 'A5' ? { w: 2480, h: 1754 } : { w: 2480, h: 3508 };
+  const scaleHD = OUT.w / displayDim.w;
+
+  // Renderizar canvas HD con el mismo transform que el preview
+  const hdCanvas = document.createElement('canvas');
+  hdCanvas.width = OUT.w;
+  hdCanvas.height = OUT.h;
+  const ctx = hdCanvas.getContext('2d');
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, OUT.w, OUT.h);
+  ctx.save();
+  ctx.translate(OUT.w / 2 + pm.offsetX * scaleHD, OUT.h / 2 + pm.offsetY * scaleHD);
+  ctx.rotate(pm.rotation * Math.PI / 180);
+  ctx.scale(pm.zoom * scaleHD, pm.zoom * scaleHD);
+  ctx.drawImage(pm.img, -pm.img.naturalWidth / 2, -pm.img.naturalHeight / 2);
+  ctx.restore();
+
+  const cropDataURL = hdCanvas.toDataURL('image/jpeg', 0.92);
+  closePrintModal();
+  showToast('🖨️ Enviando...', '');
+  try {
+    const res = await fetch('/api/print-crop', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ filename, size: fmt, cropDataURL, printer: 'EPSON L805 Series' })
+    });
+    const data = await res.json();
+    showToast(data.success ? `✅ Imprimiendo en ${fmt}` : '❌ ' + (data.error || 'Error'), data.success ? 'success' : 'error');
+    updateStats();
+  } catch (err) { showToast('❌ Error de red', 'error'); }
+}
+
+function printPhoto(filename, size) { openPrintModal(filename, size); }
+function printSelected(size) { if (selectedPhoto) openPrintModal(selectedPhoto, size); }
 
 async function sharePhoto(filename) {
   try {
@@ -428,7 +662,7 @@ function openPreview(filename, date) {
   origImg.src = `/uploads/${date}/${filename}`;
 }
 function closePreview() { document.getElementById('previewModal').classList.remove('open'); }
-function printPreview(size) { if (currentPreviewFile) printPhoto(currentPreviewFile, size); }
+function printPreview(size) { if (currentPreviewFile) { closePreview(); openPrintModal(currentPreviewFile, size); } }
 function sharePreview() { if (currentPreviewFile) { closePreview(); sharePhoto(currentPreviewFile); } }
 
 function closeShareModal() { document.getElementById('shareModal').classList.remove('open'); }
