@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <link rel="icon" href="https://fotoshow.online/static/favicon.ico"/>
+  <title>Cola de Impresión — FotoShow Print</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"/>
+  <style>
+    :root {
+      --fs-green: #ADFF2F;
+      --fs-bg: #0a0a0a;
+      --fs-card: #111;
+      --fs-border: rgba(173,255,47,0.13);
+      --fs-text: #e2e8f0;
+      --fs-muted: rgba(226,232,240,0.5);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Poppins', sans-serif; background: var(--fs-bg); color: var(--fs-text); min-height: 100vh; }
+
+    /* Navbar */
+    .fs-navbar {
+      background: var(--fs-bg); border-bottom: 1px solid var(--fs-border);
+      padding: 10px 18px; display: flex; align-items: center; justify-content: space-between;
+      position: sticky; top: 0; z-index: 100;
+    }
+    .nav-brand { display: flex; align-items: center; gap: 8px; text-decoration: none; }
+    .nav-brand img { height: 28px; }
+    .nav-brand span { font-size: 1rem; font-weight: 800; color: #fff; }
+    .nav-brand span em { color: var(--fs-green); font-style: normal; }
+    .nav-links { display: flex; gap: 4px; }
+    .nav-link { color: var(--fs-muted); text-decoration: none; font-size: 0.85rem;
+      padding: 5px 10px; border-radius: 6px; transition: color .15s; }
+    .nav-link:hover { color: var(--fs-text); }
+    .nav-link.active { color: var(--fs-green); font-weight: 600; }
+
+    /* Layout */
+    .container { max-width: 900px; margin: 0 auto; padding: 20px 16px 48px; }
+    .page-header { margin-bottom: 20px; }
+    .page-title { font-size: 1.4rem; font-weight: 800; }
+    .page-sub { color: var(--fs-muted); font-size: 0.85rem; margin-top: 4px; }
+
+    /* Printer status card */
+    .status-card {
+      background: var(--fs-card); border: 1px solid var(--fs-border);
+      border-radius: 14px; padding: 16px 20px; margin-bottom: 16px;
+      display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+      justify-content: space-between;
+    }
+    .printer-left { display: flex; align-items: center; gap: 12px; }
+    .status-dot { width: 11px; height: 11px; border-radius: 50%; flex-shrink: 0; }
+    .status-dot.idle    { background: var(--fs-green); box-shadow: 0 0 7px var(--fs-green); }
+    .status-dot.printing{ background: #60a5fa; box-shadow: 0 0 7px #60a5fa; animation: blink 1.2s ease-in-out infinite; }
+    .status-dot.error   { background: #f87171; box-shadow: 0 0 7px #f87171; }
+    .status-dot.warning { background: #fbbf24; box-shadow: 0 0 7px #fbbf24; animation: blink 1.5s ease-in-out infinite; }
+    .status-dot.unknown { background: #6b7280; }
+    @keyframes blink { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(1.4)} }
+
+    .printer-name { font-weight: 700; font-size: 0.95rem; }
+    .printer-msg  { font-size: 0.75rem; color: var(--fs-muted); margin-top: 2px; max-width: 420px; }
+
+    .status-chip {
+      font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .05em; padding: 4px 10px; border-radius: 20px;
+    }
+    .status-chip.idle    { background: rgba(173,255,47,.1); color: var(--fs-green); border: 1px solid rgba(173,255,47,.25); }
+    .status-chip.printing{ background: rgba(96,165,250,.1); color: #60a5fa; border: 1px solid rgba(96,165,250,.25); }
+    .status-chip.error   { background: rgba(248,113,113,.1); color: #f87171; border: 1px solid rgba(248,113,113,.25); }
+    .status-chip.warning { background: rgba(251,191,36,.1); color: #fbbf24; border: 1px solid rgba(251,191,36,.25); }
+    .status-chip.unknown { background: rgba(107,114,128,.1); color: #9ca3af; border: 1px solid rgba(107,114,128,.2); }
+
+    /* Toolbar */
+    .toolbar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; }
+    .queue-info { font-size: 0.82rem; color: var(--fs-muted); }
+    .queue-info strong { color: var(--fs-text); }
+    .refresh-info { font-size: 0.72rem; color: var(--fs-muted); display: flex; align-items: center; gap: 5px; }
+    .spin { width: 12px; height: 12px; border-radius: 50%; border: 2px solid rgba(173,255,47,.2); border-top-color: var(--fs-green); animation: spin .9s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .btn-group { display: flex; gap: 8px; }
+    .btn-green {
+      background: var(--fs-green); color: #000; border: none;
+      font-weight: 700; font-size: 0.82rem; padding: 7px 14px;
+      border-radius: 8px; cursor: pointer; transition: opacity .15s;
+      font-family: 'Poppins', sans-serif;
+    }
+    .btn-green:hover { opacity: .88; }
+    .btn-red {
+      background: rgba(248,113,113,.1); color: #f87171;
+      border: 1px solid rgba(248,113,113,.25);
+      font-weight: 600; font-size: 0.82rem; padding: 7px 14px;
+      border-radius: 8px; cursor: pointer; transition: background .15s;
+      font-family: 'Poppins', sans-serif;
+    }
+    .btn-red:hover { background: rgba(248,113,113,.2); }
+    .btn-red:disabled, .btn-green:disabled { opacity: .35; cursor: not-allowed; }
+    .btn-reset {
+      background: rgba(251,191,36,.1); color: #fbbf24;
+      border: 1px solid rgba(251,191,36,.25);
+      font-weight: 600; font-size: 0.82rem; padding: 7px 14px;
+      border-radius: 8px; cursor: pointer; transition: background .15s;
+      font-family: 'Poppins', sans-serif;
+    }
+    .btn-reset:hover { background: rgba(251,191,36,.2); }
+
+    .alert-item {
+      background: rgba(251,191,36,.07); border: 1px solid rgba(251,191,36,.2);
+      border-radius: 10px; padding: 10px 14px; font-size: 0.82rem;
+      display: flex; align-items: center; gap: 8px; color: #fbbf24; margin-bottom: 6px;
+    }
+    .alert-item.error { background: rgba(248,113,113,.07); border-color: rgba(248,113,113,.2); color: #f87171; }
+    .alert-item.info  { background: rgba(96,165,250,.07); border-color: rgba(96,165,250,.2); color: #60a5fa; }
+
+    /* Jobs card */
+    .jobs-card {
+      background: var(--fs-card); border: 1px solid var(--fs-border);
+      border-radius: 14px; overflow: hidden;
+    }
+
+    .job-row {
+      display: grid; grid-template-columns: 1fr auto auto auto;
+      align-items: center; gap: 12px;
+      padding: 13px 18px;
+      border-bottom: 1px solid rgba(255,255,255,.04);
+      transition: background .12s;
+    }
+    .job-row:last-child { border-bottom: none; }
+    .job-row:hover { background: rgba(255,255,255,.02); }
+    .job-row.printing-row { background: rgba(96,165,250,.04); }
+
+    .job-id-label { font-family: monospace; font-size: 0.85rem; color: var(--fs-green); font-weight: 600; }
+    .job-sub { font-size: 0.72rem; color: var(--fs-muted); margin-top: 2px; }
+
+    .job-size { font-size: 0.75rem; color: var(--fs-muted); white-space: nowrap; }
+
+    .job-badge {
+      font-size: 0.68rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .05em; padding: 3px 8px; border-radius: 10px; white-space: nowrap;
+    }
+    .job-badge.printing { background: rgba(96,165,250,.15); color: #60a5fa; }
+    .job-badge.pending  { background: rgba(107,114,128,.12); color: #9ca3af; }
+
+    .btn-cancel-job {
+      background: rgba(248,113,113,.08); color: #f87171;
+      border: 1px solid rgba(248,113,113,.2);
+      font-size: 0.72rem; font-weight: 600; padding: 4px 10px;
+      border-radius: 6px; cursor: pointer; transition: background .12s;
+      font-family: 'Poppins', sans-serif; white-space: nowrap;
+    }
+    .btn-cancel-job:hover { background: rgba(248,113,113,.2); }
+    .btn-cancel-job:disabled { opacity: .4; cursor: not-allowed; }
+
+    .btn-priority-job {
+      background: rgba(173,255,47,.07); color: var(--fs-green);
+      border: 1px solid rgba(173,255,47,.2);
+      font-size: 0.72rem; font-weight: 600; padding: 4px 10px;
+      border-radius: 6px; cursor: pointer; transition: background .12s;
+      font-family: 'Poppins', sans-serif; white-space: nowrap;
+    }
+    .btn-priority-job:hover { background: rgba(173,255,47,.14); }
+
+    /* Empty state */
+    .empty-state {
+      text-align: center; padding: 48px 24px; color: var(--fs-muted);
+    }
+    .empty-icon { font-size: 2.4rem; margin-bottom: 10px; }
+    .empty-title { font-weight: 700; color: var(--fs-text); margin-bottom: 4px; }
+
+    /* Loading */
+    .loading-state { text-align: center; padding: 40px; color: var(--fs-muted); }
+
+    /* Toast */
+    #toast-wrap { position: fixed; top: 14px; right: 14px; z-index: 9999; display: flex; flex-direction: column; gap: 6px; }
+    .toast {
+      background: #1c1c1c; border: 1px solid rgba(255,255,255,.09);
+      padding: 10px 14px; border-radius: 10px; font-size: 0.82rem;
+      animation: tin .18s ease; display: flex; align-items: center; gap: 7px;
+      min-width: 200px;
+    }
+    .toast.ok  { border-color: rgba(173,255,47,.3); }
+    .toast.err { border-color: rgba(248,113,113,.3); color: #f87171; }
+    @keyframes tin { from { opacity:0; transform: translateX(16px); } to { opacity:1; transform: translateX(0); } }
+
+    /* CUPS log */
+    .log-section { margin-top: 24px; }
+    .log-title { font-size: 0.9rem; font-weight: 700; margin-bottom: 10px; color: var(--fs-muted); }
+    .log-box {
+      background: #0d0d0d; border: 1px solid var(--fs-border);
+      border-radius: 10px; padding: 12px 14px;
+      font-family: monospace; font-size: 0.75rem;
+      color: rgba(226,232,240,.55); line-height: 1.6;
+      max-height: 220px; overflow-y: auto;
+      white-space: pre-wrap; word-break: break-all;
+    }
+    .log-box.empty { color: var(--fs-muted); font-family: 'Poppins', sans-serif; text-align: center; padding: 20px; }
+
+    @media (max-width: 560px) {
+      .job-row { grid-template-columns: 1fr auto; }
+      .job-size, .job-badge { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<nav class="fs-navbar">
+  <a class="nav-brand" href="/">
+    <img src="https://fotoshow.online/static/logo.png" alt="FotoShow" onerror="this.style.display='none'">
+    <span>Foto<em>Show</em> <span style="font-weight:500;color:var(--fs-muted);font-size:0.8rem;">Print</span></span>
+  </a>
+  <div class="nav-links">
+    <a href="/" class="nav-link">Fotos</a>
+    <a href="/fotos" class="nav-link">Cámara</a>
+    <a href="/queue" class="nav-link active">🖨 Cola</a>
+  </div>
+</nav>
+
+<div id="toast-wrap"></div>
+
+<div class="container">
+
+  <div class="page-header">
+    <div class="page-title"><i class="bi bi-printer" style="color:var(--fs-green);margin-right:6px;"></i>Cola de impresión</div>
+    <div class="page-sub">Trabajos activos en CUPS · EPSON L805</div>
+  </div>
+
+  <!-- Printer status -->
+  <div class="status-card">
+    <div class="printer-left">
+      <div class="status-dot unknown" id="dot"></div>
+      <div>
+        <div class="printer-name" id="printerName">EPSON_L805</div>
+        <div class="printer-msg" id="printerMsg">Conectando...</div>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;">
+      <span class="status-chip unknown" id="statusChip">—</span>
+      <div class="refresh-info">
+        <div class="spin" id="spinIcon" style="display:none;"></div>
+        <span id="countdown">—</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Alerts panel -->
+  <div id="alertsPanel" style="display:none; margin-bottom:14px;"></div>
+
+  <!-- Toolbar -->
+  <div class="toolbar">
+    <div>
+      <div class="queue-info">Cola: <strong id="jobCount">—</strong> trabajo(s)</div>
+    </div>
+    <div class="btn-group">
+      <button class="btn-green" onclick="refresh()">
+        <i class="bi bi-arrow-clockwise"></i> Actualizar
+      </button>
+      <button class="btn-red" id="btnCancelAll" onclick="cancelAll()" disabled>
+        <i class="bi bi-x-circle"></i> Cancelar todo
+      </button>
+      <button class="btn-reset" id="btnReset" onclick="resetPrinter()" title="Limpia la cola y re-habilita la impresora">
+        <i class="bi bi-power"></i> Reiniciar impresora
+      </button>
+    </div>
+  </div>
+
+  <!-- Jobs -->
+  <div class="jobs-card" id="jobsCard">
+    <div class="loading-state">
+      <div class="spin" style="width:20px;height:20px;margin:0 auto 10px;display:block;"></div>
+      <p>Cargando cola...</p>
+    </div>
+  </div>
+
+  <!-- CUPS log -->
+  <div class="log-section">
+    <div class="log-title"><i class="bi bi-terminal"></i> CUPS — últimos errores</div>
+    <div class="log-box empty" id="logBox">Cargando...</div>
+  </div>
+
+</div>
+
+<script>
+const INTERVAL = 4000;
+let nextAt = Date.now() + INTERVAL;
+let jobs = [];
+
+// ── Init ─────────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  refresh();
+  loadLog();
+  setInterval(refresh, INTERVAL);
+  setInterval(() => {
+    const s = Math.max(0, Math.round((nextAt - Date.now()) / 1000));
+    document.getElementById('countdown').textContent = `auto en ${s}s`;
+  }, 500);
+});
+
+// ── Refresh ───────────────────────────────────────────────────────────────────
+async function refresh() {
+  const spin = document.getElementById('spinIcon');
+  spin.style.display = 'block';
+  try {
+    const [queueRes, statusRes] = await Promise.all([
+      fetch('/api/print-queue'),
+      fetch('/api/printer-status'),
+    ]);
+    jobs = queueRes.ok ? await queueRes.json() : [];
+    const status = statusRes.ok ? await statusRes.json() : {};
+    renderStatus(status);
+    renderJobs(Array.isArray(jobs) ? jobs : []);
+  } catch (e) {
+    console.error(e);
+  } finally {
+    spin.style.display = 'none';
+    nextAt = Date.now() + INTERVAL;
+  }
+}
+
+// ── Status ────────────────────────────────────────────────────────────────────
+function renderStatus(s) {
+  const dot   = document.getElementById('dot');
+  const chip  = document.getElementById('statusChip');
+  const msg   = document.getElementById('printerMsg');
+  const name  = document.getElementById('printerName');
+  const alertsPanel = document.getElementById('alertsPanel');
+
+  const st = s.status || 'unknown';
+  const labels = { idle: 'Disponible', printing: 'Imprimiendo', error: 'Error', warning: 'Atención', unknown: '...' };
+
+  dot.className  = `status-dot ${st}`;
+  chip.className = `status-chip ${st}`;
+  chip.textContent = labels[st] || st;
+  name.textContent = s.printer || 'EPSON_L805';
+
+  let m = '';
+  if (st === 'printing' && s.printing_job) m = `Imprimiendo: ${s.printing_job}`;
+  else if (s.paper_empty) m = '⚠ Sin papel — revisá la bandeja';
+  else if (s.filter_error) m = '⚠ Error de filtro en último trabajo';
+  else if (st === 'idle') m = 'Lista para imprimir';
+  else m = s.message || '';
+  msg.textContent = m;
+
+  // Alertas
+  const alerts = s.alerts || [];
+  if (alerts.length) {
+    alertsPanel.style.display = 'block';
+    alertsPanel.innerHTML = alerts.map(a => {
+      const isPaper = /papel|media|paper/i.test(a);
+      const isFilter = /filtro|filter/i.test(a);
+      const cls = isPaper ? 'error' : isFilter ? 'error' : '';
+      return `<div class="alert-item ${cls}"><i class="bi bi-exclamation-triangle-fill"></i><span>${esc(a)}</span></div>`;
+    }).join('');
+  } else {
+    alertsPanel.style.display = 'none';
+  }
+}
+
+// ── Reset printer ─────────────────────────────────────────────────────────────
+async function resetPrinter() {
+  const btn = document.getElementById('btnReset');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Reiniciando...';
+  try {
+    const r = await fetch('/api/printer-reset', { method: 'POST' });
+    const d = await r.json();
+    toast(d.message || 'Impresora reiniciada', 'ok');
+    await refresh();
+  } catch (e) {
+    toast('Error al reiniciar: ' + e.message, 'err');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-power"></i> Reiniciar impresora';
+  }
+}
+
+// ── Jobs ──────────────────────────────────────────────────────────────────────
+function renderJobs(list) {
+  const card = document.getElementById('jobsCard');
+  const count = document.getElementById('jobCount');
+  count.textContent = list.length;
+  document.getElementById('btnCancelAll').disabled = list.length === 0;
+
+  if (!list.length) {
+    card.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon"><i class="bi bi-check-circle" style="color:var(--fs-green);"></i></div>
+        <div class="empty-title">Cola vacía</div>
+        <div style="font-size:0.82rem;margin-top:4px;">No hay trabajos pendientes</div>
+      </div>`;
+    return;
+  }
+
+  card.innerHTML = list.map(j => {
+    const isP = j.status === 'printing' || j.status === 'active';
+    const kb = j.size ? Math.round(j.size / 1024) : '?';
+    return `
+    <div class="job-row ${isP ? 'printing-row' : ''}" id="jr-${j.id}">
+      <div>
+        <div class="job-id-label">${esc(j.printer)}-${esc(j.id)}</div>
+        <div class="job-sub">Usuario: ${esc(j.user)} · ${esc(j.date)}</div>
+      </div>
+      <div class="job-size">${kb} KB</div>
+      <div>
+        <span class="job-badge ${isP ? 'printing' : 'pending'}">
+          ${isP ? '▶ Imprimiendo' : 'En cola'}
+        </span>
+      </div>
+      <div style="display:flex;gap:5px;">
+        ${!isP ? `<button class="btn-priority-job" onclick="prioritize('${esc(j.id)}')"><i class="bi bi-arrow-up"></i></button>` : ''}
+        <button class="btn-cancel-job" id="cb-${j.id}" onclick="cancelJob('${esc(j.id)}')">
+          <i class="bi bi-x"></i> Cancelar
+        </button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── Actions ───────────────────────────────────────────────────────────────────
+async function cancelJob(id) {
+  const btn = document.getElementById(`cb-${id}`);
+  if (btn) { btn.disabled = true; btn.textContent = '...'; }
+  try {
+    const r = await fetch('/api/print-queue/cancel', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jobId: id })
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'Error');
+    toast(`Trabajo ${id} cancelado`, 'ok');
+    document.getElementById(`jr-${id}`)?.remove();
+    const remaining = document.querySelectorAll('.job-row').length;
+    document.getElementById('jobCount').textContent = remaining;
+    document.getElementById('btnCancelAll').disabled = remaining === 0;
+  } catch (e) {
+    toast(e.message, 'err');
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="bi bi-x"></i> Cancelar'; }
+  }
+}
+
+async function cancelAll() {
+  const btn = document.getElementById('btnCancelAll');
+  btn.disabled = true; btn.textContent = 'Cancelando...';
+  try {
+    const r = await fetch('/api/print-queue/cancel-all', { method: 'POST' });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'Error');
+    toast('Todos los trabajos cancelados', 'ok');
+    await refresh();
+  } catch (e) {
+    toast(e.message, 'err');
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-x-circle"></i> Cancelar todo';
+  }
+}
+
+async function prioritize(id) {
+  try {
+    const r = await fetch('/api/print-queue/prioritize', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jobId: id })
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'Error');
+    toast(`Trabajo ${id} priorizado`, 'ok');
+    await refresh();
+  } catch (e) {
+    toast(e.message, 'err');
+  }
+}
+
+// ── CUPS log ──────────────────────────────────────────────────────────────────
+async function loadLog() {
+  try {
+    const r = await fetch('/api/cups-log');
+    if (!r.ok) throw new Error();
+    const d = await r.json();
+    const box = document.getElementById('logBox');
+    if (d.lines && d.lines.length) {
+      box.className = 'log-box';
+      box.textContent = d.lines.join('\n');
+      box.scrollTop = box.scrollHeight;
+    } else {
+      box.textContent = 'Sin errores recientes.';
+    }
+  } catch {
+    document.getElementById('logBox').textContent = 'No disponible (requiere permisos de root para /var/log/cups/).';
+  }
+}
+
+// ── Toast ─────────────────────────────────────────────────────────────────────
+function toast(msg, type = 'ok') {
+  const w = document.getElementById('toast-wrap');
+  const t = document.createElement('div');
+  t.className = `toast ${type}`;
+  t.innerHTML = `<i class="bi bi-${type === 'ok' ? 'check-circle' : 'exclamation-circle'}"></i><span>${esc(msg)}</span>`;
+  w.appendChild(t);
+  setTimeout(() => t.remove(), 3200);
+}
+
+function esc(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+
+</body>
+</html>

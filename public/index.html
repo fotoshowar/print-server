@@ -1,277 +1,391 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es" data-bs-theme="dark">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>FotoShow Print</title>
-  <link rel="icon" type="image/x-icon" href="https://fotoshow.online/static/favicon.ico">
+  <title>FotoShow Print Station</title>
+  <link rel="icon" href="https://fotoshow.online/static/favicon.ico">
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
   <style>
     :root {
-      --fs-green:#ADFF2F;--fs-green-dark:#7CFC00;--fs-green-rgb:173,255,47;
-      --fs-green-glow:rgba(173,255,47,0.22);--fs-bg:#0a0a0a;--fs-bg-card:#111;
-      --fs-bg-card-2:#191919;--fs-border:rgba(173,255,47,0.14);
-      --fs-border-subtle:rgba(255,255,255,0.07);--fs-text:#e2e8f0;
-      --fs-text-muted:rgba(226,232,240,0.55);
+      --fs-green: #ADFF2F;
+      --fs-green-dark: #7CFC00;
+      --fs-green-glow: rgba(173,255,47,0.22);
+      --fs-bg: #0a0a0a;
+      --fs-bg-card: #111;
+      --fs-bg-card-2: #191919;
+      --fs-border: rgba(173,255,47,0.14);
+      --fs-border-subtle: rgba(255,255,255,0.07);
+      --fs-text: #e2e8f0;
+      --fs-muted: rgba(226,232,240,0.55);
     }
-    *{box-sizing:border-box;margin:0;padding:0;}
-    body{font-family:'Poppins',sans-serif;background:var(--fs-bg);color:var(--fs-text);min-height:100vh;padding-bottom:80px;}
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Poppins', sans-serif; background: var(--fs-bg); color: var(--fs-text); min-height: 100vh; padding-bottom: 80px; }
 
-    header{
-      background:radial-gradient(ellipse 70% 60% at 20% 10%,rgba(173,255,47,0.08) 0%,transparent 55%),#0a0a0a;
-      border-bottom:1px solid var(--fs-border);padding:10px 14px;
-      display:flex;align-items:center;justify-content:space-between;
-      position:sticky;top:0;z-index:100;
+    /* ── Scrollbar ── */
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: #0a0a0a; }
+    ::-webkit-scrollbar-thumb { background: rgba(173,255,47,0.18); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(173,255,47,0.38); }
+
+    /* ── Navbar ── */
+    .fs-navbar {
+      background: rgba(10,10,10,0.92);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border-bottom: 1px solid var(--fs-border-subtle);
+      padding: 0 16px;
+      height: 54px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 200;
     }
-    .header-left{display:flex;align-items:center;gap:8px;}
-    .logo{height:28px;}
-    header h1{font-size:0.95rem;font-weight:800;color:var(--fs-green);}
-    .stats-bar{font-size:0.65rem;color:var(--fs-text-muted);}
+    .nav-brand { display: flex; align-items: center; gap: 8px; text-decoration: none; }
+    .nav-brand img { height: 28px; }
+    .nav-brand span { font-size: 1rem; font-weight: 800; color: #fff; }
+    .nav-brand span em { color: var(--fs-green); font-style: normal; }
 
-    .container{max-width:700px;margin:0 auto;padding:10px;}
-
-    /* Upload button - fixed bottom */
-    .upload-fab{
-      position:fixed;bottom:16px;right:16px;z-index:200;
-      background:var(--fs-green);color:#0a0a0a;border:none;border-radius:50%;
-      width:56px;height:56px;font-size:1.5rem;cursor:pointer;
-      box-shadow:0 4px 20px var(--fs-green-glow);
-      display:flex;align-items:center;justify-content:center;
-      transition:all 0.2s;
+    /* ── Camera status badge ── */
+    .cam-badge {
+      display: flex; align-items: center; gap: 6px;
+      background: var(--fs-bg-card);
+      border: 1px solid var(--fs-border-subtle);
+      border-radius: 999px;
+      padding: 4px 10px 4px 6px;
+      font-size: 0.72rem; font-weight: 600; color: var(--fs-muted);
+      cursor: default; transition: border-color 0.2s;
     }
-    .upload-fab:hover{transform:scale(1.1);box-shadow:0 6px 30px var(--fs-green-glow);}
-    .upload-fab input{display:none;}
-
-    /* Upload compact zone */
-    .upload-zone{
-      background:var(--fs-bg-card);border:1px dashed var(--fs-border);
-      border-radius:12px;padding:14px;text-align:center;margin-bottom:10px;
-      cursor:pointer;transition:all 0.3s;display:none;
+    .cam-badge.active { border-color: var(--fs-border); color: var(--fs-text); }
+    .cam-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: #444; flex-shrink: 0;
     }
-    .upload-zone.visible{display:block;cursor:pointer;}
-    .upload-zone:hover{border-color:var(--fs-green);background:rgba(173,255,47,0.03);}
-    .upload-zone p{color:var(--fs-text-muted);font-size:0.8rem;}
+    .cam-dot.scanning { background: #444; }
+    .cam-dot.connecting { background: #fbbf24; animation: pulse-yellow 1s infinite; }
+    .cam-dot.downloading { background: var(--fs-green); animation: pulse-green 1s infinite; }
+    .cam-dot.idle-ok { background: var(--fs-green); }
+    @keyframes pulse-green { 0%,100%{opacity:1} 50%{opacity:.35} }
+    @keyframes pulse-yellow { 0%,100%{opacity:1} 50%{opacity:.35} }
 
-    /* Progress */
-    .upload-progress{display:none;background:var(--fs-bg-card);border-radius:10px;padding:10px 14px;margin-bottom:10px;border:1px solid var(--fs-border-subtle);}
-    .progress-bar{height:4px;background:var(--fs-bg-card-2);border-radius:2px;overflow:hidden;margin-top:4px;}
-    .progress-fill{height:100%;background:var(--fs-green);border-radius:2px;transition:width 0.3s;width:0%;}
+    /* ── Container ── */
+    .container { max-width: 720px; margin: 0 auto; padding: 12px 14px; }
 
-    /* Day header */
-    .day-header{
-      font-size:0.8rem;font-weight:700;color:var(--fs-green);
-      padding:8px 0 6px;border-bottom:1px solid var(--fs-border);
-      margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;
+    /* ── Status cards row ── */
+    .status-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+    .stat-card {
+      background: var(--fs-bg-card);
+      border: 1px solid var(--fs-border-subtle);
+      border-radius: 12px;
+      padding: 10px 14px;
+      display: flex; align-items: center; gap: 10px;
     }
-    .day-header .count{font-size:0.7rem;color:var(--fs-text-muted);font-weight:500;}
+    .stat-card .icon { font-size: 1.4rem; flex-shrink: 0; }
+    .stat-card .info { min-width: 0; }
+    .stat-card .label { font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--fs-muted); }
+    .stat-card .value { font-size: 0.85rem; font-weight: 700; color: var(--fs-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .stat-card .sub { font-size: 0.65rem; color: var(--fs-muted); margin-top: 1px; }
 
-    /* Photo grid - 3 columns mobile, 4 desktop */
-    .photo-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:14px;}
-    @media(min-width:600px){.photo-grid{grid-template-columns:repeat(4,1fr);gap:8px;}}
-    @media(min-width:900px){.photo-grid{grid-template-columns:repeat(5,1fr);}}
-
-    .photo-card{
-      background:var(--fs-bg-card);border-radius:8px;overflow:hidden;
-      border:1px solid var(--fs-border-subtle);transition:all 0.2s;
-      position:relative;
+    /* ── Upload zone ── */
+    .upload-zone {
+      background: var(--fs-bg-card);
+      border: 1px dashed rgba(173,255,47,0.2);
+      border-radius: 12px;
+      padding: 14px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+      margin-bottom: 12px;
     }
-    .photo-card:hover{border-color:var(--fs-border);}
-    .photo-card img{width:100%;aspect-ratio:3/4;object-fit:cover;display:block;cursor:pointer;}
-    .photo-card img.horizontal{aspect-ratio:3/4;}
+    .upload-zone:hover { border-color: var(--fs-green); background: rgba(173,255,47,0.03); }
+    .upload-zone p { color: var(--fs-muted); font-size: 0.8rem; font-weight: 500; }
 
-    /* Selected photo actions bar */
-    .action-bar{
-      display:none;position:fixed;bottom:0;left:0;right:0;
-      background:var(--fs-bg-card);border-top:1px solid var(--fs-border);
-      padding:10px 14px;z-index:150;
+    /* ── Progress ── */
+    .upload-progress { display: none; background: var(--fs-bg-card); border-radius: 10px; padding: 10px 14px; margin-bottom: 12px; border: 1px solid var(--fs-border-subtle); }
+    .progress-bar { height: 4px; background: var(--fs-bg-card-2); border-radius: 2px; overflow: hidden; margin-top: 6px; }
+    .progress-fill { height: 100%; background: var(--fs-green); border-radius: 2px; transition: width 0.3s; width: 0%; }
+
+    /* ── Day header ── */
+    .day-header {
+      font-size: 0.78rem; font-weight: 700; color: var(--fs-green);
+      padding: 10px 0 6px;
+      border-bottom: 1px solid var(--fs-border);
+      margin-bottom: 8px;
+      display: flex; align-items: center; justify-content: space-between;
     }
-    .action-bar.visible{display:flex;gap:8px;align-items:center;justify-content:center;}
-    .action-bar .btn-action{
-      padding:10px 16px;border:none;border-radius:10px;
-      font-size:0.85rem;font-weight:700;cursor:pointer;
-      font-family:'Poppins',sans-serif;
+    .day-count { font-size: 0.68rem; color: var(--fs-muted); font-weight: 500; }
+
+    /* ── Photo grid ── */
+    .photo-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 6px; margin-bottom: 14px; }
+    @media(min-width:500px) { .photo-grid { grid-template-columns: repeat(4,1fr); } }
+    @media(min-width:700px) { .photo-grid { grid-template-columns: repeat(5,1fr); } }
+
+    .photo-card {
+      background: var(--fs-bg-card);
+      border-radius: 8px;
+      overflow: hidden;
+      border: 2px solid transparent;
+      transition: border-color 0.15s, transform 0.15s;
+      position: relative;
+      cursor: pointer;
     }
-    .action-bar .btn-a4{background:var(--fs-green);color:#0a0a0a;}
-    .action-bar .btn-a5{background:var(--fs-green-dark);color:#0a0a0a;}
-    .action-bar .btn-qr{background:rgba(0,255,127,0.2);color:#00FF7F;border:1px solid rgba(0,255,127,0.3);}
-    .action-bar .btn-del{background:rgba(255,50,50,0.15);color:#ff6b6b;border:1px solid rgba(255,50,50,0.2);}
+    .photo-card:hover { transform: translateY(-2px); }
+    .photo-card.selected { border-color: var(--fs-green); box-shadow: 0 0 10px var(--fs-green-glow); }
+    .photo-card img { width: 100%; aspect-ratio: 3/4; object-fit: cover; display: block; }
+    .photo-card img.horizontal { aspect-ratio: 3/4; }
+    .photo-card .select-check {
+      display: none;
+      position: absolute; top: 5px; right: 5px;
+      width: 20px; height: 20px;
+      background: var(--fs-green); color: #0a0a0a;
+      border-radius: 50%; font-size: 0.65rem; font-weight: 800;
+      align-items: center; justify-content: center;
+    }
+    .photo-card.selected .select-check { display: flex; }
 
-    .photo-card.selected{border:2px solid var(--fs-green);box-shadow:0 0 12px var(--fs-green-glow);}
+    /* ── FAB ── */
+    .upload-fab {
+      position: fixed; bottom: 20px; right: 16px; z-index: 300;
+      background: var(--fs-green); color: #0a0a0a;
+      border: none; border-radius: 50%;
+      width: 54px; height: 54px;
+      font-size: 1.4rem; cursor: pointer;
+      box-shadow: 0 4px 20px var(--fs-green-glow);
+      display: flex; align-items: center; justify-content: center;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .upload-fab:hover { transform: scale(1.1); box-shadow: 0 6px 30px var(--fs-green-glow); }
 
-    /* Share Modal */
-    .modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.9);z-index:1000;align-items:center;justify-content:center;padding:20px;}
-    .modal.open{display:flex;}
-    .modal-content{background:var(--fs-bg-card);border:1px solid var(--fs-border);border-radius:20px;padding:20px;max-width:340px;width:100%;text-align:center;}
-    .modal-content img.preview{width:100%;max-height:160px;object-fit:contain;border-radius:10px;margin:8px 0;}
-    .modal-content img.qr{width:160px;height:160px;border-radius:8px;margin:8px auto;background:white;padding:6px;}
-    .modal-content h3{font-size:0.95rem;color:var(--fs-green);}
-    .share-code{font-size:1.6rem;font-weight:900;color:var(--fs-green);letter-spacing:4px;background:var(--fs-bg);padding:8px 14px;border-radius:10px;margin:6px 0;font-family:monospace;border:1px solid var(--fs-border);text-shadow:0 0 10px var(--fs-green-glow);}
-    .share-url{font-size:0.65rem;color:var(--fs-text-muted);word-break:break-all;background:var(--fs-bg);padding:6px 10px;border-radius:8px;margin:6px 0;cursor:pointer;border:1px solid var(--fs-border-subtle);}
-    .share-url:hover{color:var(--fs-green);}
-    .modal-close{background:var(--fs-bg-card-2);color:var(--fs-text);border:1px solid var(--fs-border-subtle);border-radius:10px;padding:8px 20px;font-size:0.85rem;cursor:pointer;margin-top:8px;font-weight:600;font-family:'Poppins',sans-serif;}
+    /* ── Action bar ── */
+    .action-bar {
+      display: none; position: fixed; bottom: 0; left: 0; right: 0;
+      background: var(--fs-bg-card);
+      border-top: 1px solid var(--fs-border);
+      padding: 10px 14px; z-index: 150;
+      gap: 8px; align-items: center; justify-content: center;
+    }
+    .action-bar.visible { display: flex; }
+    .btn-act {
+      padding: 9px 16px; border: none; border-radius: 8px;
+      font-size: 0.82rem; font-weight: 700; cursor: pointer;
+      font-family: 'Poppins', sans-serif; transition: opacity 0.15s;
+    }
+    .btn-act:hover { opacity: 0.85; }
+    .btn-print { background: var(--fs-green); color: #0a0a0a; }
+    .btn-print2 { background: var(--fs-green-dark); color: #0a0a0a; }
+    .btn-share { background: rgba(173,255,47,0.12); color: var(--fs-green); border: 1px solid rgba(173,255,47,0.25); }
+    .btn-del { background: rgba(239,68,68,0.12); color: #f87171; border: 1px solid rgba(239,68,68,0.2); }
 
-    /* Preview Modal */
-    .preview-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.95);z-index:1001;align-items:center;justify-content:center;padding:10px;}
-    .preview-modal.open{display:flex;flex-direction:column;gap:10px;}
-    .preview-modal img{max-width:100%;max-height:75vh;object-fit:contain;border-radius:8px;}
-    .preview-actions{display:flex;gap:8px;justify-content:center;}
-    .preview-actions .btn-action{padding:10px 20px;border:none;border-radius:10px;font-size:0.9rem;font-weight:700;cursor:pointer;font-family:'Poppins',sans-serif;}
-    .preview-close{position:absolute;top:10px;right:10px;background:rgba(173,255,47,0.15);border:1px solid rgba(173,255,47,0.3);width:36px;height:36px;border-radius:50%;font-size:1.2rem;cursor:pointer;color:var(--fs-green);display:flex;align-items:center;justify-content:center;}
+    /* ── Modals ── */
+    .fs-modal {
+      display: none; position: fixed; inset: 0;
+      background: rgba(5,5,5,0.88); backdrop-filter: blur(8px);
+      z-index: 1000; align-items: center; justify-content: center; padding: 16px;
+    }
+    .fs-modal.open { display: flex; }
+    .modal-card {
+      background: var(--fs-bg-card);
+      border: 1px solid var(--fs-border);
+      border-radius: 16px;
+      padding: 20px;
+      width: 100%; max-width: 360px;
+      max-height: 90vh; overflow-y: auto;
+    }
+    .modal-title { font-size: 1rem; font-weight: 800; color: var(--fs-green); margin-bottom: 14px; display: flex; align-items: center; gap: 6px; }
+    .modal-close-btn {
+      width: 100%; padding: 10px; border: 1px solid var(--fs-border-subtle);
+      background: var(--fs-bg-card-2); color: var(--fs-muted);
+      border-radius: 8px; font-size: 0.85rem; font-weight: 600;
+      cursor: pointer; font-family: 'Poppins', sans-serif; margin-top: 8px;
+    }
+    .btn-neon {
+      background: linear-gradient(90deg, #ADFF2F, #32CD32);
+      color: #0a0a0a; border: none; border-radius: 8px;
+      font-size: 0.9rem; font-weight: 700; padding: 11px 16px;
+      cursor: pointer; font-family: 'Poppins', sans-serif;
+      width: 100%; box-shadow: 0 0 18px rgba(173,255,47,0.28);
+      transition: all 0.2s;
+    }
+    .btn-neon:hover { box-shadow: 0 0 30px rgba(173,255,47,0.45); transform: translateY(-1px); }
+
+    /* Share modal */
+    .share-code { font-size: 1.8rem; font-weight: 900; color: var(--fs-green); letter-spacing: 5px; background: var(--fs-bg); padding: 10px 14px; border-radius: 10px; margin: 10px 0; font-family: monospace; border: 1px solid var(--fs-border); text-align: center; }
+    .share-url { font-size: 0.65rem; color: var(--fs-muted); word-break: break-all; background: var(--fs-bg); padding: 8px 10px; border-radius: 8px; margin: 6px 0; cursor: pointer; border: 1px solid var(--fs-border-subtle); text-align: center; }
+    .share-url:hover { color: var(--fs-green); }
+    .share-preview { width: 100%; max-height: 160px; object-fit: contain; border-radius: 8px; margin: 8px 0; }
+    .share-qr { width: 150px; height: 150px; border-radius: 8px; background: #fff; padding: 6px; display: block; margin: 6px auto; }
+
+    /* Preview modal */
+    .preview-modal {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.96); z-index: 1001;
+      align-items: center; justify-content: center; flex-direction: column; gap: 10px;
+    }
+    .preview-modal.open { display: flex; }
+    .preview-modal img { max-width: 100%; max-height: 75vh; object-fit: contain; border-radius: 8px; }
+    .preview-actions { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+    .preview-close {
+      position: absolute; top: 12px; right: 14px;
+      background: rgba(173,255,47,0.12); border: 1px solid rgba(173,255,47,0.25);
+      width: 34px; height: 34px; border-radius: 50%;
+      font-size: 1.1rem; cursor: pointer; color: var(--fs-green);
+      display: flex; align-items: center; justify-content: center;
+    }
+
+
+    /* Index modal */
+    select.fs-sel {
+      background: var(--fs-bg); color: var(--fs-green);
+      border: 1px solid var(--fs-border); border-radius: 8px;
+      padding: 8px 12px; font-size: 1rem; font-weight: 700;
+      font-family: 'Poppins', sans-serif; text-align: center;
+    }
+
+    /* Empty state */
+    .empty-state { text-align: center; padding: 48px 16px; color: var(--fs-muted); }
+    .empty-state .ei { font-size: 3rem; margin-bottom: 8px; }
+    .empty-state p { font-size: 0.85rem; }
 
     /* Toast */
-    .toast{position:fixed;top:60px;left:50%;transform:translateX(-50%) translateY(-80px);background:var(--fs-bg-card);color:var(--fs-text);padding:10px 18px;border-radius:10px;font-size:0.8rem;transition:transform 0.3s;z-index:2000;max-width:300px;text-align:center;border:1px solid var(--fs-border);font-family:'Poppins',sans-serif;}
-    .toast.show{transform:translateX(-50%) translateY(0);}
-    .toast.success{border-color:var(--fs-green);color:var(--fs-green);}
-    .toast.error{border-color:#ff4444;color:#ff6b6b;}
+    .toast {
+      position: fixed; top: 62px; left: 50%;
+      transform: translateX(-50%) translateY(-80px);
+      background: var(--fs-bg-card); color: var(--fs-text);
+      padding: 10px 18px; border-radius: 10px;
+      font-size: 0.82rem; transition: transform 0.3s; z-index: 2000;
+      max-width: 300px; text-align: center;
+      border: 1px solid var(--fs-border); font-family: 'Poppins', sans-serif;
+      white-space: nowrap;
+    }
+    .toast.show { transform: translateX(-50%) translateY(0); }
+    .toast.success { border-color: var(--fs-green); color: var(--fs-green); }
+    .toast.error { border-color: #f87171; color: #f87171; }
 
-    .empty-state{text-align:center;padding:40px 16px;color:var(--fs-text-muted);}
-    .empty-state .icon{font-size:3rem;margin-bottom:8px;}
-    .spinner{display:inline-block;width:14px;height:14px;border:2px solid rgba(173,255,47,0.3);border-top-color:var(--fs-green);border-radius:50%;animation:spin 0.7s linear infinite;}
-    @keyframes spin{to{transform:rotate(360deg);}}
-    .badge-fs{font-size:0.6rem;background:rgba(173,255,47,0.1);padding:2px 6px;border-radius:5px;color:var(--fs-green);border:1px solid rgba(173,255,47,0.2);}
-
-    /* Print Config Modal */
-    .fmt-tab{flex:1;padding:8px 4px;border:1px solid var(--fs-border);border-radius:8px;background:var(--fs-bg-card-2);color:var(--fs-text-muted);font-size:0.78rem;font-weight:600;cursor:pointer;font-family:'Poppins',sans-serif;transition:all 0.2s;}
-    .fmt-tab.active{background:rgba(173,255,47,0.15);color:var(--fs-green);border-color:var(--fs-green);}
-    .ctrl-btn{padding:8px 10px;border:1px solid var(--fs-border);border-radius:8px;background:var(--fs-bg-card-2);color:var(--fs-text);font-size:0.78rem;font-weight:600;cursor:pointer;font-family:'Poppins',sans-serif;white-space:nowrap;}
-    .paper-frame{position:relative;overflow:hidden;background:white;border-radius:3px;box-shadow:0 6px 28px rgba(0,0,0,0.7),0 0 0 1px rgba(255,255,255,0.08);margin:0 auto;cursor:grab;touch-action:none;flex-shrink:0;}
-    .paper-frame:active{cursor:grabbing;}
-    .zoom-range{flex:1;accent-color:var(--fs-green);height:4px;}
+    .spinner { display: inline-block; width: 12px; height: 12px; border: 2px solid rgba(173,255,47,0.3); border-top-color: var(--fs-green); border-radius: 50%; animation: spin 0.7s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
   </style>
 </head>
 <body>
 
-<header>
-  <div class="header-left">
-    <img src="https://fotoshow.online/static/logo.png" class="logo" alt="FotoShow" onerror="this.style.display='none'">
-    <div>
-      <h1>FotoShow Print</h1>
-      <div class="stats-bar" id="statsBar">Cargando...</div>
+<!-- Navbar -->
+<nav class="fs-navbar">
+  <a class="nav-brand" href="#">
+    <img src="https://fotoshow.online/static/logo.png" alt="FotoShow" onerror="this.style.display='none'">
+    <span>Foto<em>Show</em> <span style="font-weight:500;color:var(--fs-muted);font-size:0.8rem;">Print</span></span>
+  </a>
+  <div style="display:flex;align-items:center;gap:8px;">
+    <div class="cam-badge" id="camBadge">
+      <span class="cam-dot scanning" id="camDot"></span>
+      <span id="camLabel">Cámara</span>
     </div>
+    <a href="/queue" style="color:rgba(226,232,240,0.5);text-decoration:none;font-size:0.82rem;padding:5px 10px;border-radius:6px;transition:color .15s;" onmouseover="this.style.color='#e2e8f0'" onmouseout="this.style.color='rgba(226,232,240,0.5)'">
+      🖨 Cola
+    </a>
   </div>
-  <span class="badge-fs" id="printCount"></span>
-</header>
+</nav>
 
 <div class="container">
-  <!-- Upload zone siempre visible -->
-  <div class="upload-zone visible" onclick="document.getElementById('fileInput').click()">
-    <p>📸 Toca para subir fotos (hasta 200)</p>
+
+  <!-- Status cards -->
+  <div class="status-row" style="margin-top:12px;">
+    <div class="stat-card" id="cardCamera">
+      <span class="icon">📷</span>
+      <div class="info">
+        <div class="label">Cámara</div>
+        <div class="value" id="camStatusVal">Iniciando...</div>
+        <div class="sub" id="camStatusSub"></div>
+      </div>
+    </div>
+    <div class="stat-card">
+      <span class="icon">🖨️</span>
+      <div class="info">
+        <div class="label">Impresora</div>
+        <div class="value">EPSON L805</div>
+        <div class="sub" id="printStats">— impresiones</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Upload zone -->
+  <div class="upload-zone" onclick="document.getElementById('fileInput').click()">
+    <p><i class="bi bi-cloud-arrow-up" style="font-size:1.2rem;color:var(--fs-green);vertical-align:middle;margin-right:6px;"></i>Tocá para subir fotos desde el celular o PC</p>
   </div>
 
   <div class="upload-progress" id="uploadProgress">
     <p id="progressText" style="font-size:0.8rem;">Subiendo...</p>
     <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
   </div>
+
   <div id="content"></div>
 </div>
 
-<!-- FAB Upload -->
-<button class="upload-fab" onclick="document.getElementById('fileInput').click()">📸</button>
+<!-- FAB -->
+<button class="upload-fab" onclick="document.getElementById('fileInput').click()">
+  <i class="bi bi-camera"></i>
+</button>
 <input type="file" id="fileInput" accept="image/*" multiple style="display:none">
 
-<!-- Action bar for selected photo -->
+<!-- Action bar -->
 <div class="action-bar" id="actionBar">
-  <button class="btn-action btn-a4" onclick="printSelected('A4')">🖨️ A4</button>
-  <button class="btn-action btn-a5" onclick="printSelected('A5')">📄 A5</button>
-  <button class="btn-action btn-qr" onclick="shareSelected()">📤 QR</button>
-  <button class="btn-action btn-del" onclick="deleteSelected()">🗑️</button>
+  <button class="btn-act btn-print" onclick="printDirect(selectedPhoto)"><i class="bi bi-printer"></i> A4</button>
+  <button class="btn-act btn-print2" onclick="printA5(selectedPhoto)"><i class="bi bi-printer"></i> A5</button>
+  <button class="btn-act btn-share" onclick="shareSelected()"><i class="bi bi-qr-code"></i></button>
+  <button class="btn-act btn-del" onclick="deleteSelected()"><i class="bi bi-trash"></i></button>
 </div>
 
 <!-- Share Modal -->
-<div class="modal" id="shareModal" onclick="if(event.target===this)closeShareModal()">
-  <div class="modal-content">
-    <h3>📤 Compartir</h3>
-    <img class="preview" id="sharePreview" src="" alt="">
+<div class="fs-modal" id="shareModal" onclick="if(event.target===this)closeShareModal()">
+  <div class="modal-card">
+    <div class="modal-title"><i class="bi bi-qr-code"></i> Compartir foto</div>
+    <img class="share-preview" id="sharePreview" src="" alt="">
     <div class="share-code" id="shareCode">------</div>
-    <img class="qr" id="shareQR" src="" alt="QR">
-    <div class="share-url" id="shareURL" onclick="copyURL()">Toca para copiar</div>
-    <button class="modal-close" onclick="closeShareModal()">Cerrar</button>
+    <img class="share-qr" id="shareQR" src="" alt="QR">
+    <div class="share-url" id="shareURL" onclick="copyURL()">Tocá para copiar enlace</div>
+    <button class="btn-neon" onclick="copyURL()" style="margin-top:8px;"><i class="bi bi-clipboard"></i> Copiar enlace</button>
+    <button class="modal-close-btn" onclick="closeShareModal()">Cerrar</button>
   </div>
 </div>
 
 <!-- Preview Modal -->
 <div class="preview-modal" id="previewModal" onclick="if(event.target===this)closePreview()">
-  <button class="preview-close" onclick="closePreview()">✕</button>
+  <button class="preview-close" onclick="closePreview()"><i class="bi bi-x"></i></button>
   <img id="previewImg" src="" alt="">
   <div class="preview-actions">
-    <button class="btn-action btn-a4" onclick="printPreview('A4')">🖨️ A4</button>
-    <button class="btn-action btn-a5" onclick="printPreview('A5')">📄 A5</button>
-    <button class="btn-action btn-qr" onclick="sharePreview()">📤 QR</button>
-    <button class="btn-action btn-del" style="background:rgba(255,50,50,0.15);color:#ff6b6b;border:1px solid rgba(255,50,50,0.2);" onclick="if(confirm('¿Eliminar?')){closePreview();deletePhoto(currentPreviewFile)}">🗑️</button>
+    <button class="btn-act btn-print" onclick="printFromPreview('a4')"><i class="bi bi-printer"></i> A4</button>
+    <button class="btn-act btn-print2" onclick="printFromPreview('a5')"><i class="bi bi-printer"></i> A5</button>
+    <button class="btn-act btn-share" onclick="sharePreview()"><i class="bi bi-qr-code"></i> QR</button>
+    <button class="btn-act btn-del" onclick="if(confirm('¿Eliminar?')){closePreview();deletePhoto(currentPreviewFile)}"><i class="bi bi-trash"></i></button>
   </div>
 </div>
 
-<!-- Index Config Modal -->
-<div class="modal" id="indexModal" onclick="if(event.target===this)closeIndexModal()">
-  <div class="modal-content" style="max-width:320px;">
-    <h3>🖨️ Imprimir Índice</h3>
-    <p style="margin:8px 0;"><span id="indexCount">0</span> fotos</p>
-    <div style="display:flex;gap:10px;justify-content:center;align-items:center;margin:12px 0;">
+
+<!-- Index Modal -->
+<div class="fs-modal" id="indexModal" onclick="if(event.target===this)closeIndexModal()">
+  <div class="modal-card" style="max-width:330px;">
+    <div class="modal-title"><i class="bi bi-grid-3x3"></i> Imprimir Índice</div>
+    <p style="font-size:0.82rem;color:var(--fs-muted);margin-bottom:12px;"><span id="indexCount">0</span> fotos seleccionadas</p>
+    <div style="display:flex;gap:12px;justify-content:center;align-items:center;margin-bottom:12px;">
       <div style="text-align:center;">
-        <label style="font-size:0.7rem;color:var(--fs-text-muted);">Columnas</label><br>
-        <select id="indexCols" onchange="updateIndexPreview()" style="background:var(--fs-bg);color:var(--fs-green);border:1px solid var(--fs-border);border-radius:8px;padding:8px 12px;font-size:1.1rem;font-weight:700;font-family:'Poppins',sans-serif;text-align:center;">
-          <option value="3">3</option>
-          <option value="4">4</option>
-          <option value="5" selected>5</option>
-          <option value="6">6</option>
-          <option value="7">7</option>
-          <option value="8">8</option>
+        <div style="font-size:0.65rem;color:var(--fs-muted);margin-bottom:4px;">Columnas</div>
+        <select id="indexCols" class="fs-sel" onchange="updateIndexPreview()">
+          <option>3</option><option>4</option><option value="5" selected>5</option><option>6</option><option>7</option><option>8</option>
         </select>
       </div>
-      <span style="font-size:1.2rem;color:var(--fs-text-muted);margin-top:14px;">×</span>
+      <span style="font-size:1.2rem;color:var(--fs-muted);margin-top:14px;">×</span>
       <div style="text-align:center;">
-        <label style="font-size:0.7rem;color:var(--fs-text-muted);">Filas</label><br>
-        <select id="indexRows" onchange="updateIndexPreview()" style="background:var(--fs-bg);color:var(--fs-green);border:1px solid var(--fs-border);border-radius:8px;padding:8px 12px;font-size:1.1rem;font-weight:700;font-family:'Poppins',sans-serif;text-align:center;">
-          <option value="4">4</option>
-          <option value="5">5</option>
-          <option value="6">6</option>
-          <option value="7" selected>7</option>
-          <option value="8">8</option>
-          <option value="9">9</option>
-          <option value="10">10</option>
+        <div style="font-size:0.65rem;color:var(--fs-muted);margin-bottom:4px;">Filas</div>
+        <select id="indexRows" class="fs-sel" onchange="updateIndexPreview()">
+          <option>4</option><option>5</option><option>6</option><option value="7" selected>7</option><option>8</option><option>9</option><option>10</option>
         </select>
       </div>
     </div>
-    <p id="indexPages" style="font-size:0.75rem;color:var(--fs-text-muted);margin-bottom:8px;">1 hoja(s) — 5×7 = 35 por hoja</p>
-    <div id="indexPreviewContainer" style="background:white;border-radius:8px;padding:6px;margin-bottom:10px;max-height:50vh;overflow-y:auto;"></div>
-    <button onclick="printIndex()" style="background:var(--fs-green);color:#0a0a0a;border:none;border-radius:10px;padding:12px 24px;font-size:1rem;font-weight:700;cursor:pointer;width:100%;font-family:'Poppins',sans-serif;">🖨️ Imprimir Índice</button>
-    <button class="modal-close" onclick="closeIndexModal()" style="margin-top:8px;">Cancelar</button>
-  </div>
-</div>
-
-<!-- Print Config Modal -->
-<div class="modal" id="printModal" onclick="if(event.target===this)closePrintModal()">
-  <div class="modal-content" style="max-width:360px;padding:16px;">
-    <h3 style="margin-bottom:12px;">🖨️ Configurar impresión</h3>
-
-    <!-- Formato -->
-    <div style="display:flex;gap:8px;margin-bottom:12px;">
-      <button class="fmt-tab active" id="tabA4" onclick="setPrintFormat('A4')">📄 A4 completo</button>
-      <button class="fmt-tab" id="tabA5" onclick="setPrintFormat('A5')">📋 Media hoja A5</button>
-    </div>
-
-    <!-- Canvas de previsualización -->
-    <div style="display:flex;justify-content:center;margin-bottom:10px;">
-      <div class="paper-frame" id="paperFrame">
-        <canvas id="cropCanvas"></canvas>
-      </div>
-    </div>
-
-    <!-- Controles -->
-    <div style="display:flex;gap:6px;align-items:center;margin-bottom:8px;">
-      <button class="ctrl-btn" onclick="rotatePrint(-90)">↺ -90°</button>
-      <button class="ctrl-btn" onclick="rotatePrint(90)">↻ +90°</button>
-      <button class="ctrl-btn" onclick="resetPrintTransform()">⟳ Reset</button>
-    </div>
-    <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;">
-      <span style="font-size:0.72rem;color:var(--fs-text-muted);">Zoom</span>
-      <input type="range" class="zoom-range" id="zoomRange" min="0.5" max="4" step="0.05" value="1" oninput="setZoom(parseFloat(this.value))">
-      <span style="font-size:0.72rem;color:var(--fs-text-muted);min-width:36px;" id="zoomLabel">100%</span>
-    </div>
-    <p style="font-size:0.7rem;color:var(--fs-text-muted);margin-bottom:10px;text-align:center;">Arrastrá para reencuadrar · Pellizco para zoom</p>
-
-    <button onclick="confirmPrint()" style="background:var(--fs-green);color:#0a0a0a;border:none;border-radius:10px;padding:12px;font-size:0.95rem;font-weight:700;cursor:pointer;width:100%;font-family:'Poppins',sans-serif;">🖨️ Imprimir</button>
-    <button class="modal-close" onclick="closePrintModal()" style="margin-top:8px;width:100%;">Cancelar</button>
+    <p id="indexPages" style="font-size:0.72rem;color:var(--fs-muted);text-align:center;margin-bottom:8px;"></p>
+    <div id="indexPreviewContainer" style="background:white;border-radius:8px;padding:6px;margin-bottom:12px;max-height:40vh;overflow-y:auto;"></div>
+    <button class="btn-neon" onclick="printIndex()"><i class="bi bi-printer"></i> Imprimir Índice</button>
+    <button class="modal-close-btn" onclick="closeIndexModal()">Cancelar</button>
   </div>
 </div>
 
@@ -283,11 +397,11 @@ let selectedPhoto = null;
 let currentPreviewFile = null;
 let currentShareURL = '';
 
-const fileInput = document.getElementById('fileInput');
-fileInput.addEventListener('change', e => {
+// ── Upload ──────────────────────────────────────────────────────────────────
+document.getElementById('fileInput').addEventListener('change', e => {
   const files = Array.from(e.target.files);
-  if (files.length > 0) uploadPhotos(files);
-  fileInput.value = '';
+  if (files.length) uploadPhotos(files);
+  e.target.value = '';
 });
 
 async function uploadPhotos(files) {
@@ -304,21 +418,19 @@ async function uploadPhotos(files) {
     const iv = setInterval(() => { p = Math.min(p + 10, 90); fill.style.width = p + '%'; }, 300);
     const res = await fetch('/api/upload', { method: 'POST', body: fd });
     clearInterval(iv); fill.style.width = '100%';
-    if (!res.ok) throw new Error('Error');
+    if (!res.ok) throw new Error();
     const data = await res.json();
     showToast(`✅ ${data.photos.length} foto(s) subida(s)`, 'success');
-    const uploadedFiles = data.photos.map(p => p.filename);
+    const names = data.photos.map(p => p.filename);
     setTimeout(() => {
       el.style.display = 'none';
       loadPhotos();
-      // Ofrecer imprimir indice
-      if (uploadedFiles.length > 1) {
-        setTimeout(() => showIndexModal(uploadedFiles), 500);
-      }
+      if (names.length > 1) setTimeout(() => showIndexModal(names), 500);
     }, 500);
-  } catch (err) { el.style.display = 'none'; showToast('❌ Error al subir', 'error'); }
+  } catch { el.style.display = 'none'; showToast('❌ Error al subir', 'error'); }
 }
 
+// ── Photos ──────────────────────────────────────────────────────────────────
 async function loadPhotos() {
   try {
     const res = await fetch('/api/photos?limit=500');
@@ -326,35 +438,30 @@ async function loadPhotos() {
     allPhotos = data.groups || {};
     renderAll(data);
     updateStats();
-  } catch (err) { console.error(err); }
+  } catch(e) { console.error(e); }
 }
 
 function renderAll(data) {
   const el = document.getElementById('content');
-  if (data.total === 0) {
-    el.innerHTML = '<div class="empty-state"><div class="icon">📸</div><p>No hay fotos.<br>Tocá 📸 para subir.</p></div>';
+  if (!data.total) {
+    el.innerHTML = '<div class="empty-state"><div class="ei">📷</div><p>Sin fotos aún.<br>Subí desde el celular o esperá que la cámara se conecte.</p></div>';
     return;
   }
   let html = '';
   for (const date of data.dates) {
     const photos = data.groups[date];
-    const label = formatDate(date);
     html += `<div class="day-header">
-      <span>📅 ${label}</span>
+      <span><i class="bi bi-calendar-event" style="margin-right:5px;"></i>${formatDate(date)}</span>
       <span style="display:flex;gap:6px;align-items:center;">
-        <span class="count">${photos.length} fotos</span>
-        <button onclick="printIndexForDate('${date}')" style="background:var(--fs-green);color:#0a0a0a;border:none;border-radius:6px;padding:3px 8px;font-size:0.65rem;font-weight:700;cursor:pointer;font-family:'Poppins',sans-serif;">🖨️ Índice</button>
+        <span class="day-count">${photos.length} fotos</span>
+        <button onclick="printIndexForDate('${date}')" style="background:rgba(173,255,47,0.12);color:var(--fs-green);border:1px solid var(--fs-border);border-radius:6px;padding:2px 8px;font-size:0.62rem;font-weight:700;cursor:pointer;font-family:'Poppins',sans-serif;"><i class="bi bi-grid-3x3"></i> Índice</button>
       </span>
-    </div>`;
-    html += '<div class="photo-grid">';
+    </div><div class="photo-grid">`;
     for (const p of photos) {
-      const cls = p.isHorizontal ? 'horizontal' : '';
       const sel = selectedPhoto === p.filename ? 'selected' : '';
-      html += `<div class="photo-card ${sel}" id="card-${p.filename}">
-        <img class="${cls}" src="/thumbs/${p.date}/${p.filename}" loading="lazy"
-             onerror="this.src='/uploads/${p.date}/${p.filename}'"
-             onclick="openPreview('${p.filename}','${p.date}')"
-             oncontextmenu="event.preventDefault();selectPhoto('${p.filename}')">
+      html += `<div class="photo-card ${sel}" id="card-${p.filename}" onclick="openPreview('${p.filename}','${p.date}')" oncontextmenu="event.preventDefault();selectPhoto('${p.filename}')">
+        <img src="/thumbs/${p.date}/${p.filename}" loading="lazy" onerror="this.src='/uploads/${p.date}/${p.filename}'">
+        <div class="select-check">✓</div>
       </div>`;
     }
     html += '</div>';
@@ -364,9 +471,9 @@ function renderAll(data) {
 
 function formatDate(d) {
   const today = new Date().toISOString().slice(0,10);
-  const yesterday = new Date(Date.now()-86400000).toISOString().slice(0,10);
+  const yest  = new Date(Date.now()-86400000).toISOString().slice(0,10);
   if (d === today) return 'Hoy';
-  if (d === yesterday) return 'Ayer';
+  if (d === yest)  return 'Ayer';
   const [y,m,day] = d.split('-');
   return `${day}/${m}/${y}`;
 }
@@ -387,222 +494,46 @@ function selectPhoto(filename) {
   if (card) card.classList.toggle('selected', selectedPhoto === filename);
 }
 
-// ---- PRINT MODAL ----
-let pm = {
-  filename: null, format: 'A4',
-  rotation: 0, zoom: 1,
-  offsetX: 0, offsetY: 0,
-  dragging: false, lastX: 0, lastY: 0,
-  pinchDist: null, pinchZoom: 1,
-  img: null
-};
-
-const PAPER_PX = { A4: { w: 200, h: 283 }, A5: { w: 200, h: 141 } };
-
-function openPrintModal(filename, defaultFormat) {
-  pm.filename = filename;
-  pm.format = defaultFormat || 'A4';
-  pm.rotation = 0; pm.zoom = 1; pm.offsetX = 0; pm.offsetY = 0;
-  pm.img = null;
-  document.getElementById('zoomRange').value = 1;
-  document.getElementById('zoomLabel').textContent = '100%';
-  setPrintFormat(pm.format);
-  document.getElementById('printModal').classList.add('open');
-  loadPrintImage(filename);
-}
-
-function loadPrintImage(filename) {
-  const photo = findPhoto(filename);
-  if (!photo) return;
-  pm.origReady = false;
-
-  // Mostrar thumb rápido para preview
-  const thumb = new Image();
-  thumb.onload = () => { pm.img = thumb; fitImageToFrame(); renderCrop(); };
-  thumb.src = `/thumbs/${photo.date}/${filename}`;
-
-  // Cargar original en background — marca cuando está lista
-  const orig = new Image();
-  orig.crossOrigin = 'anonymous';
-  orig.onload = () => { pm.img = orig; pm.origReady = true; renderCrop(); };
-  orig.onerror = () => { pm.origReady = true; }; // si falla, usa thumb
-  orig.src = `/uploads/${photo.date}/${filename}`;
-  pm._origImg = orig; // guardar referencia para forzar carga
-}
-
-function setPrintFormat(fmt) {
-  pm.format = fmt;
-  document.getElementById('tabA4').classList.toggle('active', fmt === 'A4');
-  document.getElementById('tabA5').classList.toggle('active', fmt === 'A5');
-  const dim = PAPER_PX[fmt];
-  const frame = document.getElementById('paperFrame');
-  const canvas = document.getElementById('cropCanvas');
-  frame.style.width = dim.w + 'px';
-  frame.style.height = dim.h + 'px';
-  canvas.width = dim.w;
-  canvas.height = dim.h;
-  pm.offsetX = 0; pm.offsetY = 0;
-  if (pm.img) { fitImageToFrame(); renderCrop(); }
-}
-
-function fitImageToFrame() {
-  if (!pm.img) return;
-  const dim = PAPER_PX[pm.format];
-  const rad = pm.rotation * Math.PI / 180;
-  const cos = Math.abs(Math.cos(rad)), sin = Math.abs(Math.sin(rad));
-  const rw = pm.img.naturalWidth * cos + pm.img.naturalHeight * sin;
-  const rh = pm.img.naturalWidth * sin + pm.img.naturalHeight * cos;
-  const scale = Math.max(dim.w / rw, dim.h / rh);
-  pm.zoom = scale;
-  pm.offsetX = 0; pm.offsetY = 0;
-  const sliderVal = Math.min(4, Math.max(0.5, scale));
-  document.getElementById('zoomRange').value = sliderVal;
-  document.getElementById('zoomLabel').textContent = Math.round(scale * 100) + '%';
-}
-
-function renderCrop() {
-  const canvas = document.getElementById('cropCanvas');
-  const ctx = canvas.getContext('2d');
-  const dim = PAPER_PX[pm.format];
-  ctx.clearRect(0, 0, dim.w, dim.h);
-  ctx.fillStyle = '#fff';
-  ctx.fillRect(0, 0, dim.w, dim.h);
-  if (!pm.img) return;
-  ctx.save();
-  ctx.translate(dim.w / 2 + pm.offsetX, dim.h / 2 + pm.offsetY);
-  ctx.rotate(pm.rotation * Math.PI / 180);
-  ctx.scale(pm.zoom, pm.zoom);
-  ctx.drawImage(pm.img, -pm.img.naturalWidth / 2, -pm.img.naturalHeight / 2);
-  ctx.restore();
-}
-
-function rotatePrint(deg) {
-  pm.rotation = (pm.rotation + deg + 360) % 360;
-  fitImageToFrame();
-  renderCrop();
-}
-
-function setZoom(v) {
-  pm.zoom = v;
-  document.getElementById('zoomLabel').textContent = Math.round(v * 100) + '%';
-  renderCrop();
-}
-
-function resetPrintTransform() {
-  pm.rotation = 0; pm.offsetX = 0; pm.offsetY = 0;
-  fitImageToFrame();
-  renderCrop();
-}
-
-function closePrintModal() {
-  document.getElementById('printModal').classList.remove('open');
-  pm.img = null; pm.filename = null;
-}
-
-// Drag con mouse
-(function() {
-  function onCanvas(e) { return e.target === document.getElementById('cropCanvas'); }
-
-  document.addEventListener('mousedown', e => {
-    if (!onCanvas(e)) return;
-    pm.dragging = true; pm.lastX = e.clientX; pm.lastY = e.clientY;
-    e.preventDefault();
-  });
-  document.addEventListener('mousemove', e => {
-    if (!pm.dragging) return;
-    pm.offsetX += e.clientX - pm.lastX;
-    pm.offsetY += e.clientY - pm.lastY;
-    pm.lastX = e.clientX; pm.lastY = e.clientY;
-    renderCrop();
-  });
-  document.addEventListener('mouseup', () => { pm.dragging = false; });
-
-  // Touch drag + pinch
-  document.addEventListener('touchstart', e => {
-    if (!onCanvas(e)) return;
-    if (e.touches.length === 1) {
-      pm.dragging = true; pm.pinchDist = null;
-      pm.lastX = e.touches[0].clientX; pm.lastY = e.touches[0].clientY;
-    } else if (e.touches.length === 2) {
-      pm.dragging = false;
-      pm.pinchDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
-      pm.pinchZoom = pm.zoom;
-    }
-    e.preventDefault();
-  }, { passive: false });
-
-  document.addEventListener('touchmove', e => {
-    if (!onCanvas(e)) return;
-    if (e.touches.length === 1 && pm.dragging) {
-      pm.offsetX += e.touches[0].clientX - pm.lastX;
-      pm.offsetY += e.touches[0].clientY - pm.lastY;
-      pm.lastX = e.touches[0].clientX; pm.lastY = e.touches[0].clientY;
-      renderCrop();
-    } else if (e.touches.length === 2 && pm.pinchDist !== null) {
-      const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
-      const nz = Math.min(4, Math.max(0.5, pm.pinchZoom * (d / pm.pinchDist)));
-      pm.zoom = nz;
-      document.getElementById('zoomRange').value = nz;
-      document.getElementById('zoomLabel').textContent = Math.round(nz * 100) + '%';
-      renderCrop();
-    }
-    e.preventDefault();
-  }, { passive: false });
-
-  document.addEventListener('touchend', () => { pm.dragging = false; pm.pinchDist = null; });
-})();
-
-async function confirmPrint() {
-  if (!pm.filename) return;
-  const fmt = pm.format;
-  closePrintModal();
-  showToast('🖨️ Enviando HD...', '');
-  try {
-    const res = await fetch('/api/print-hd', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        filename: pm.filename,
-        size: fmt,
-        rotation: pm.rotation,
-        zoom: pm.zoom,
-        offsetX: pm.offsetX,
-        offsetY: pm.offsetY,
-        printer: 'EPSON L805 Series'
-      })
-    });
-    const data = await res.json();
-    showToast(data.success ? `✅ ${data.message}` : '❌ ' + (data.error || 'Error'), data.success ? 'success' : 'error');
-    updateStats();
-  } catch (err) { showToast('❌ Error de red', 'error'); }
-}
-
-function printPhoto(filename, size) { openPrintModal(filename, size); }
-
-// Imprimir directo con calidad completa (sin recorte/ajustes)
-async function printPhotoDirect(filename, size, btnEl) {
-  if (btnEl) {
-    btnEl.disabled = true;
-    const origText = btnEl.textContent;
-    btnEl.textContent = '...';
-    setTimeout(() => { btnEl.disabled = false; btnEl.textContent = origText; }, 2000);
+function findPhoto(filename) {
+  for (const photos of Object.values(allPhotos)) {
+    const p = photos.find(x => x.filename === filename);
+    if (p) return p;
   }
+  return null;
+}
 
-  showToast(`🖨️ Imprimiendo en ${size} (calidad completa)`, '');
+// ── Preview ─────────────────────────────────────────────────────────────────
+function openPreview(filename, date) {
+  currentPreviewFile = filename;
+  document.getElementById('previewImg').src = `/thumbs/${date}/${filename}`;
+  document.getElementById('previewModal').classList.add('open');
+  const orig = new Image();
+  orig.onload = () => { document.getElementById('previewImg').src = orig.src; };
+  orig.src = `/uploads/${date}/${filename}`;
+}
+function closePreview() { document.getElementById('previewModal').classList.remove('open'); }
+function printPreview(size) { if (currentPreviewFile) { closePreview(); openPrintModal(currentPreviewFile, size); } }
+function sharePreview() { if (currentPreviewFile) { closePreview(); sharePhoto(currentPreviewFile); } }
+
+// ── Print ────────────────────────────────────────────────────────────────────
+async function printDirect(filename, size = 'a4') {
+  if (!filename) return;
+  showToast(size === 'a5' ? '🖨️ Preparando A5...' : '🖨️ Enviando a imprimir...', '');
   try {
     const res = await fetch('/api/print', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ filename, size, printer: 'EPSON L805 Series' })
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ filename, printer: 'EPSON_L805', size })
     });
     const data = await res.json();
-    showToast(data.success ? `✅ ${data.message}` : '❌ ' + (data.error || 'Error'), data.success ? 'success' : 'error');
+    showToast(data.success ? `✅ Enviado a imprimir (${size.toUpperCase()})` : '❌ ' + (data.error || 'Error'), data.success ? 'success' : 'error');
     updateStats();
-  } catch (err) { showToast('❌ Error de red', 'error'); }
+  } catch { showToast('❌ Error de red', 'error'); }
 }
 
-function printSelected(size) { if (selectedPhoto) openPrintModal(selectedPhoto, size); }
+function printA5(filename) { printDirect(filename, 'a5'); }
+function printFromPreview(size = 'a4') { if (currentPreviewFile) { closePreview(); printDirect(currentPreviewFile, size); } }
 
+// ── Share ────────────────────────────────────────────────────────────────────
 async function sharePhoto(filename) {
   try {
     const res = await fetch(`/api/share/${filename}`);
@@ -614,59 +545,28 @@ async function sharePhoto(filename) {
     document.getElementById('shareURL').textContent = data.shareURL;
     currentShareURL = data.shareURL;
     document.getElementById('shareModal').classList.add('open');
-  } catch (err) { showToast('❌ Error', 'error'); }
+  } catch { showToast('❌ Error al generar QR', 'error'); }
+}
+function shareSelected() { if (selectedPhoto) sharePhoto(selectedPhoto); }
+function closeShareModal() { document.getElementById('shareModal').classList.remove('open'); }
+function copyURL() {
+  navigator.clipboard.writeText(currentShareURL)
+    .then(() => showToast('📋 Enlace copiado', 'success'))
+    .catch(() => { const el = document.createElement('textarea'); el.value = currentShareURL; document.body.appendChild(el); el.select(); document.execCommand('copy'); document.body.removeChild(el); showToast('📋 Copiado', 'success'); });
 }
 
-function shareSelected() { if (selectedPhoto) sharePhoto(selectedPhoto); }
-
+// ── Delete ───────────────────────────────────────────────────────────────────
 async function deletePhoto(filename) {
   try {
     await fetch(`/api/photos/${filename}`, { method: 'DELETE' });
-    showToast('🗑️ Eliminada', '');
+    showToast('🗑️ Foto eliminada', '');
     if (selectedPhoto === filename) { selectedPhoto = null; document.getElementById('actionBar').classList.remove('visible'); }
     loadPhotos();
-  } catch (err) { showToast('❌ Error', 'error'); }
+  } catch { showToast('❌ Error', 'error'); }
 }
+function deleteSelected() { if (selectedPhoto && confirm('¿Eliminar esta foto?')) deletePhoto(selectedPhoto); }
 
-function deleteSelected() { if (selectedPhoto && confirm('¿Eliminar?')) deletePhoto(selectedPhoto); }
-
-function findPhoto(filename) {
-  for (const photos of Object.values(allPhotos)) {
-    const p = photos.find(x => x.filename === filename);
-    if (p) return p;
-  }
-  return null;
-}
-
-function openPreview(filename, date) {
-  currentPreviewFile = filename;
-  // Primero mostrar thumbnail rapido, luego cargar original
-  document.getElementById('previewImg').src = `/thumbs/${date}/${filename}`;
-  document.getElementById('previewModal').classList.add('open');
-  // Cargar original en background
-  const origImg = new Image();
-  origImg.onload = () => { document.getElementById('previewImg').src = origImg.src; };
-  origImg.src = `/uploads/${date}/${filename}`;
-}
-function closePreview() { document.getElementById('previewModal').classList.remove('open'); }
-function printPreview(size) { if (currentPreviewFile) { closePreview(); openPrintModal(currentPreviewFile, size); } }
-function sharePreview() { if (currentPreviewFile) { closePreview(); sharePhoto(currentPreviewFile); } }
-
-function closeShareModal() { document.getElementById('shareModal').classList.remove('open'); }
-function copyURL() {
-  navigator.clipboard.writeText(currentShareURL).then(() => showToast('📋 Copiado!', 'success'))
-  .catch(() => { const el = document.createElement('textarea'); el.value = currentShareURL; document.body.appendChild(el); el.select(); document.execCommand('copy'); document.body.removeChild(el); showToast('📋 Copiado!', 'success'); });
-}
-
-async function updateStats() {
-  try {
-    const res = await fetch('/api/stats');
-    const s = await res.json();
-    document.getElementById('statsBar').textContent = `📸 ${s.totalUploaded} subidas`;
-    document.getElementById('printCount').textContent = `🖨️${s.totalPrinted} · ⬇️${s.totalDownloaded}`;
-  } catch(e) {}
-}
-
+// ── Index ────────────────────────────────────────────────────────────────────
 let lastUploadedFiles = [];
 
 function showIndexModal(filenames) {
@@ -682,10 +582,8 @@ function updateIndexPreview() {
   const perPage = cols * rows;
   const pages = Math.ceil(lastUploadedFiles.length / perPage);
   document.getElementById('indexPages').textContent = `${pages} hoja(s) — ${cols}×${rows} = ${perPage} por hoja`;
-
   const container = document.getElementById('indexPreviewContainer');
   let html = '';
-
   for (let page = 0; page < pages; page++) {
     const pageFiles = lastUploadedFiles.slice(page * perPage, (page + 1) * perPage);
     if (pages > 1) html += `<div style="font-size:0.6rem;color:#999;text-align:center;margin:4px 0;">Hoja ${page + 1}</div>`;
@@ -695,10 +593,9 @@ function updateIndexPreview() {
         const fname = pageFiles[i];
         const photo = findPhoto(fname);
         const date = photo ? photo.date : new Date().toISOString().slice(0,10);
-        const num = page * perPage + i + 1;
         html += `<div style="position:relative;overflow:hidden;border-radius:2px;background:#eee;">
           <img src="/thumbs/${date}/${fname}" style="width:100%;aspect-ratio:3/4;object-fit:cover;display:block;" onerror="this.src='/uploads/${date}/${fname}'">
-          <div style="position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,0.5);color:white;font-size:0.45rem;text-align:center;padding:1px;">#${num}</div>
+          <div style="position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,0.5);color:white;font-size:0.45rem;text-align:center;padding:1px;">#${page * perPage + i + 1}</div>
         </div>`;
       } else {
         html += `<div style="background:#f5f5f5;border-radius:2px;"></div>`;
@@ -706,7 +603,6 @@ function updateIndexPreview() {
     }
     html += '</div>';
   }
-
   container.innerHTML = html;
 }
 
@@ -719,30 +615,78 @@ async function printIndex() {
   closeIndexModal();
   try {
     const res = await fetch('/api/print-index', {
-      method: 'POST', headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ filenames: lastUploadedFiles, cols, rows, printer: 'EPSON L805 Series' })
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ filenames: lastUploadedFiles, cols, rows, printer: 'EPSON_L805' })
     });
     const data = await res.json();
-    if (data.success) showToast(`✅ ${data.message}`, 'success');
-    else showToast('❌ ' + (data.error || 'Error'), 'error');
-  } catch (err) { showToast('❌ Error', 'error'); }
+    showToast(data.success ? `✅ ${data.message}` : '❌ ' + (data.error || 'Error'), data.success ? 'success' : 'error');
+  } catch { showToast('❌ Error', 'error'); }
 }
 
 function printIndexForDate(date) {
-  const photos = [];
-  if (allPhotos[date]) allPhotos[date].forEach(p => photos.push(p.filename));
-  if (photos.length === 0) return showToast('No hay fotos', 'error');
-  showIndexModal(photos);
+  const photos = allPhotos[date] || [];
+  if (!photos.length) return showToast('No hay fotos', 'error');
+  showIndexModal(photos.map(p => p.filename));
 }
 
+// ── Stats ────────────────────────────────────────────────────────────────────
+async function updateStats() {
+  try {
+    const res = await fetch('/api/stats');
+    const s = await res.json();
+    document.getElementById('printStats').textContent = `${s.totalPrinted || 0} impresiones`;
+  } catch {}
+}
+
+// ── Camera Status ─────────────────────────────────────────────────────────────
+const STATE_CONFIG = {
+  scanning:    { dot: 'scanning',    label: 'Esperando cámara' },
+  connecting:  { dot: 'connecting',  label: 'Conectando...' },
+  downloading: { dot: 'downloading', label: 'Descargando fotos' },
+  idle:        { dot: 'idle-ok',     label: 'Listo' },
+  offline:     { dot: 'scanning',    label: 'Monitor apagado' },
+};
+
+async function updateCameraStatus() {
+  try {
+    const s = await fetch('/api/camera/status').then(r => r.json());
+    const cfg = STATE_CONFIG[s.state] || STATE_CONFIG.offline;
+
+    document.getElementById('camDot').className = 'cam-dot ' + cfg.dot;
+    document.getElementById('camLabel').textContent = cfg.label;
+    document.getElementById('camBadge').classList.toggle('active', s.state === 'downloading' || s.state === 'connecting');
+
+    document.getElementById('camStatusVal').textContent = s.message || cfg.label;
+
+    let sub = '';
+    if (s.ssid) sub = s.ssid;
+    if (s.last_ts && s.state !== 'downloading') {
+      const ago = Math.round((Date.now() - new Date(s.last_ts)) / 60000);
+      const count = s.last_count ?? 0;
+      sub = `Última bajada: ${count} fotos, hace ${ago < 1 ? 'menos de 1' : ago} min`;
+    }
+    document.getElementById('camStatusSub').textContent = sub;
+
+    // Reload photos if just finished downloading
+    if (s.state === 'idle' && s.last_count > 0) {
+      loadPhotos();
+    }
+  } catch {}
+}
+
+// ── Toast ────────────────────────────────────────────────────────────────────
 function showToast(msg, type) {
-  const t = document.getElementById('toast'); t.textContent = msg;
+  const t = document.getElementById('toast');
+  t.textContent = msg;
   t.className = 'toast show ' + (type || '');
   setTimeout(() => t.classList.remove('show'), 2500);
 }
 
+// ── Init ─────────────────────────────────────────────────────────────────────
 loadPhotos();
+updateCameraStatus();
 setInterval(loadPhotos, 30000);
+setInterval(updateCameraStatus, 8000);
 </script>
 </body>
 </html>

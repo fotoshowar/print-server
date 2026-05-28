@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FotoShow — Carrusel</title>
+<style>
+  :root {
+    --fs-green: #ADFF2F;
+    --fs-bg: #0a0a0a;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #000;
+    color: #e2e8f0;
+    font-family: 'Poppins', system-ui, sans-serif;
+    height: 100vh;
+    overflow: hidden;
+    user-select: none;
+  }
+
+  /* ── Foto principal ── */
+  #stage {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  #foto-actual {
+    max-width: 100vw;
+    max-height: 100vh;
+    object-fit: contain;
+    transition: opacity 0.4s ease;
+  }
+  #foto-actual.fade { opacity: 0; }
+
+  /* ── Overlay top ── */
+  #top-bar {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    padding: 12px 18px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: linear-gradient(to bottom, rgba(0,0,0,0.75) 0%, transparent 100%);
+    z-index: 10;
+    transition: opacity 0.3s;
+  }
+  .brand { font-size: 1rem; font-weight: 800; color: #fff; }
+  .brand em { color: var(--fs-green); font-style: normal; }
+  #contador { font-size: 0.85rem; color: rgba(255,255,255,0.65); }
+
+  /* ── Overlay bottom ── */
+  #bottom-bar {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    padding: 16px 20px 20px;
+    background: linear-gradient(to top, rgba(0,0,0,0.82) 0%, transparent 100%);
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    transition: opacity 0.3s;
+  }
+  #bottom-bar.hidden, #top-bar.hidden { opacity: 0; pointer-events: none; }
+
+  /* Botones de control */
+  .ctrl {
+    background: rgba(255,255,255,0.12);
+    border: 1px solid rgba(255,255,255,0.18);
+    color: #fff;
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-size: 1.1rem;
+    cursor: pointer;
+    backdrop-filter: blur(6px);
+    transition: background 0.15s;
+    flex-shrink: 0;
+  }
+  .ctrl:hover { background: rgba(255,255,255,0.22); }
+  #btn-play { background: rgba(173,255,47,0.18); border-color: rgba(173,255,47,0.35); color: var(--fs-green); }
+  #btn-play:hover { background: rgba(173,255,47,0.3); }
+
+  /* Nombre de foto */
+  #nombre-foto {
+    flex: 1;
+    font-size: 0.78rem;
+    color: rgba(255,255,255,0.55);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* Selector intervalo */
+  #sel-intervalo {
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.18);
+    color: #fff;
+    border-radius: 8px;
+    padding: 7px 10px;
+    font-size: 0.82rem;
+    cursor: pointer;
+    backdrop-filter: blur(6px);
+  }
+  #sel-intervalo option { background: #111; color: #fff; }
+
+  /* Progress bar */
+  #progress-bar {
+    position: fixed;
+    bottom: 0; left: 0;
+    height: 3px;
+    background: var(--fs-green);
+    z-index: 20;
+    transition: width linear;
+  }
+
+  /* Sin fotos */
+  #sin-fotos {
+    display: none;
+    position: fixed;
+    inset: 0;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    color: rgba(255,255,255,0.45);
+    text-align: center;
+  }
+  #sin-fotos.visible { display: flex; }
+  #sin-fotos .icono { font-size: 3rem; }
+  #sin-fotos p { font-size: 1rem; }
+  #sin-fotos small { font-size: 0.8rem; color: rgba(255,255,255,0.3); }
+
+  /* Link volver */
+  #btn-volver {
+    position: fixed;
+    top: 14px; right: 18px;
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.18);
+    color: rgba(255,255,255,0.7);
+    border-radius: 8px;
+    padding: 6px 12px;
+    font-size: 0.78rem;
+    cursor: pointer;
+    text-decoration: none;
+    backdrop-filter: blur(6px);
+    z-index: 20;
+  }
+  #btn-volver:hover { color: #fff; background: rgba(255,255,255,0.18); }
+</style>
+</head>
+<body>
+
+<div id="stage">
+  <img id="foto-actual" src="" alt="">
+</div>
+
+<div id="top-bar">
+  <div class="brand">Foto<em>Show</em></div>
+  <span id="contador">—</span>
+</div>
+
+<a href="/" id="btn-volver">← Volver</a>
+
+<div id="bottom-bar">
+  <button class="ctrl" id="btn-prev" onclick="ir(-1)" title="Anterior">&#8592;</button>
+  <button class="ctrl" id="btn-play" onclick="togglePlay()" title="Play/Pausa">⏸</button>
+  <button class="ctrl" id="btn-next" onclick="ir(1)" title="Siguiente">&#8594;</button>
+  <span id="nombre-foto"></span>
+  <select id="sel-intervalo" onchange="cambiarIntervalo(this.value)" title="Intervalo">
+    <option value="1" selected>1 s</option>
+    <option value="3">3 s</option>
+    <option value="5">5 s</option>
+    <option value="8">8 s</option>
+    <option value="12">12 s</option>
+    <option value="20">20 s</option>
+    <option value="30">30 s</option>
+  </select>
+</div>
+
+<div id="progress-bar" style="width:0%"></div>
+
+<div id="sin-fotos">
+  <div class="icono">📷</div>
+  <p>No hay fotos en la última hora</p>
+  <small>Subí fotos y aparecerán aquí automáticamente</small>
+</div>
+
+<script>
+let fotos = [];
+let idx = 0;
+let intervalo = 1;
+let playing = true;
+let timer = null;
+let progressTimer = null;
+let hideUITimer = null;
+let refreshTimer = null;
+let loadSeq = 0;
+
+const elFoto   = document.getElementById('foto-actual');
+const elCount  = document.getElementById('contador');
+const elNombre = document.getElementById('nombre-foto');
+const elPlay   = document.getElementById('btn-play');
+const elProg   = document.getElementById('progress-bar');
+const elEmpty  = document.getElementById('sin-fotos');
+const elTop    = document.getElementById('top-bar');
+const elBot    = document.getElementById('bottom-bar');
+
+async function cargarFotos() {
+  try {
+    const r = await fetch('/api/carrusel');
+    const d = await r.json();
+    const nuevas = d.fotos || [];
+
+    if (!nuevas.length) {
+      fotos = [];
+      elEmpty.classList.add('visible');
+      elFoto.src = '';
+      elCount.textContent = 'Sin fotos recientes';
+      pararTimer();
+      return;
+    }
+
+    elEmpty.classList.remove('visible');
+
+    // Agregar fotos nuevas sin reiniciar el índice
+    const urlsActuales = new Set(fotos.map(f => f.url));
+    const agregadas = nuevas.filter(f => !urlsActuales.has(f.url));
+    if (agregadas.length) {
+      fotos = nuevas;
+      // Si no hay foto mostrándose, mostrar la primera
+      if (!elFoto.getAttribute('src')) {
+        idx = 0;
+        mostrar(idx);
+      }
+    } else {
+      fotos = nuevas;
+    }
+  } catch(e) {
+    console.error('Error cargando fotos:', e);
+  }
+}
+
+function mostrar(i) {
+  if (!fotos.length) return;
+  idx = ((i % fotos.length) + fotos.length) % fotos.length;
+  const foto = fotos[idx];
+  const seq = ++loadSeq;
+  const srcInicial = foto.thumb || foto.url;
+
+  pararTimer();
+  elCount.textContent = `${idx + 1} / ${fotos.length}`;
+  elNombre.textContent = foto.filename;
+  reiniciarProgreso();
+
+  elFoto.onload = null;
+  elFoto.onerror = () => {
+    if (seq === loadSeq && foto.url && elFoto.getAttribute('src') !== foto.url) {
+      elFoto.src = foto.url;
+    }
+  };
+  elFoto.classList.remove('fade');
+  elFoto.src = srcInicial;
+
+  precargarSiguiente();
+  if (foto.url && foto.url !== srcInicial) mejorarImagen(seq, foto.url);
+  if (playing) arrancarTimer();
+}
+
+function precargarSiguiente() {
+  if (fotos.length < 2) return;
+  const siguiente = fotos[(idx + 1) % fotos.length];
+  const img = new Image();
+  img.src = siguiente.thumb || siguiente.url;
+}
+
+function mejorarImagen(seq, url) {
+  const img = new Image();
+  img.onload = () => {
+    if (seq === loadSeq) elFoto.src = url;
+  };
+  img.src = url;
+}
+
+function ir(delta) {
+  pararTimer();
+  mostrar(idx + delta);
+}
+
+function togglePlay() {
+  playing = !playing;
+  elPlay.textContent = playing ? '⏸' : '▶';
+  if (playing) {
+    arrancarTimer();
+  } else {
+    pararTimer();
+  }
+}
+
+function cambiarIntervalo(val) {
+  intervalo = parseInt(val);
+  if (playing) {
+    pararTimer();
+    arrancarTimer();
+  }
+}
+
+function arrancarTimer() {
+  pararTimer();
+  reiniciarProgreso();
+  timer = setTimeout(() => {
+    mostrar(idx + 1);
+  }, intervalo * 1000);
+}
+
+function pararTimer() {
+  clearTimeout(timer);
+  timer = null;
+  clearInterval(progressTimer);
+  elProg.style.transition = 'none';
+  elProg.style.width = '0%';
+}
+
+function reiniciarProgreso() {
+  clearInterval(progressTimer);
+  elProg.style.transition = 'none';
+  elProg.style.width = '0%';
+  setTimeout(() => {
+    elProg.style.transition = `width ${intervalo}s linear`;
+    elProg.style.width = '100%';
+  }, 30);
+}
+
+// Ocultar UI tras 3s sin movimiento
+function resetHideUI() {
+  elTop.classList.remove('hidden');
+  elBot.classList.remove('hidden');
+  clearTimeout(hideUITimer);
+  hideUITimer = setTimeout(() => {
+    elTop.classList.add('hidden');
+    elBot.classList.add('hidden');
+  }, 3000);
+}
+
+document.addEventListener('mousemove', resetHideUI);
+document.addEventListener('touchstart', resetHideUI);
+document.addEventListener('keydown', e => {
+  resetHideUI();
+  if (e.key === 'ArrowRight') ir(1);
+  else if (e.key === 'ArrowLeft') ir(-1);
+  else if (e.key === ' ') { e.preventDefault(); togglePlay(); }
+});
+
+// Swipe táctil
+let touchX = null;
+document.addEventListener('touchstart', e => { touchX = e.touches[0].clientX; });
+document.addEventListener('touchend', e => {
+  if (touchX === null) return;
+  const diff = touchX - e.changedTouches[0].clientX;
+  if (Math.abs(diff) > 50) ir(diff > 0 ? 1 : -1);
+  touchX = null;
+});
+
+// Arranque
+cargarFotos();
+// Refresca lista cada 60s para capturar fotos nuevas
+setInterval(cargarFotos, 60000);
+resetHideUI();
+</script>
+</body>
+</html>

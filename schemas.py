@@ -13,6 +13,14 @@ class PrintTypeEnum(str, Enum):
     CONTACT_SHEET = "contact_sheet"
 
 
+class PaperTypeEnum(str, Enum):
+    """Tipos de papel disponibles"""
+    PLAIN = "plain"
+    GLOSSY = "glossy"
+    MATTE = "matte"
+    PHOTO = "photo"
+
+
 class PhotoBase(BaseModel):
     filename: str
     fotoshow_photo_id: int
@@ -61,6 +69,7 @@ class GalleryOut(GalleryBase):
 
 class PrintLogBase(BaseModel):
     print_type: PrintTypeEnum
+    paper_type: PaperTypeEnum = PaperTypeEnum.PLAIN
     print_count: int = 1
     printer_model: str = "EPSON_L805"
     print_quality: str = "high"
@@ -120,7 +129,8 @@ class HealthResponse(BaseModel):
 
 class PrintRequest(BaseModel):
     photo_ids: List[int]
-    paper_size: str = "A4"
+    print_type: PrintTypeEnum = PrintTypeEnum.A4
+    paper_type: PaperTypeEnum = PaperTypeEnum.PLAIN
     quality: str = "high"
     copies: int = 1
 

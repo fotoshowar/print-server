@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Terminal — FotoShow</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0f172a; display: flex; flex-direction: column; height: 100dvh; }
+
+  #toolbar {
+    background: #1e293b;
+    border-bottom: 1px solid #334155;
+    padding: 8px 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+  }
+  #toolbar span { color: #38bdf8; font-family: monospace; font-size: 14px; font-weight: 700; flex: 1; }
+  .fs-btn {
+    background: #334155;
+    color: #e2e8f0;
+    border: none;
+    border-radius: 6px;
+    width: 36px;
+    height: 36px;
+    font-size: 20px;
+    font-weight: 700;
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+  .fs-btn:active { background: #38bdf8; color: #000; }
+  #fs-val { color: #94a3b8; font-family: monospace; font-size: 13px; min-width: 30px; text-align: center; }
+
+  #frame {
+    flex: 1;
+    border: none;
+    width: 100%;
+  }
+</style>
+</head>
+<body>
+
+<div id="toolbar">
+  <span>FotoShow Terminal</span>
+  <button class="fs-btn" onclick="chgFs(-2)">−</button>
+  <span id="fs-val">14px</span>
+  <button class="fs-btn" onclick="chgFs(2)">+</button>
+</div>
+
+<iframe id="frame" src="/terminal/" allow="clipboard-read; clipboard-write"></iframe>
+
+<script>
+var fs = parseInt(localStorage.getItem('ttyd_fs') || '14');
+
+function applyFs() {
+  document.getElementById('fs-val').textContent = fs + 'px';
+  try {
+    var win = document.getElementById('frame').contentWindow;
+    var tty = win && win.tty;
+    if (tty && tty.term) {
+      tty.term.options.fontSize = fs;
+      tty.term.refresh(0, tty.term.rows - 1);
+    }
+  } catch(e) {}
+}
+
+function chgFs(d) {
+  fs = Math.max(8, Math.min(36, fs + d));
+  localStorage.setItem('ttyd_fs', fs);
+  applyFs();
+}
+
+document.getElementById('frame').addEventListener('load', function() {
+  // Esperar a que xterm inicialice
+  var check = setInterval(function() {
+    try {
+      var tty = document.getElementById('frame').contentWindow.tty;
+      if (tty && tty.term) { applyFs(); clearInterval(check); }
+    } catch(e) { clearInterval(check); }
+  }, 300);
+});
+</script>
+
+</body>
+</html>

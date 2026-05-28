@@ -175,26 +175,93 @@ Write-Host "OK"
   });
 }
 
-// Linux/Pi: CUPS (lp)
-function printWithCUPS(filepath, printerName, options = {}) {
-  const { paperSize, isHorizontal } = options;
-  return new Promise((resolve, reject) => {
-    // Sanitizar nombre: si no es un nombre CUPS válido, usar default
-    const safeName = (printerName && /^[a-zA-Z0-9_-]+$/.test(printerName)) ? printerName : DEFAULT_PRINTER;
-    let cmd = `lp -d "${safeName}"`;
-    cmd += paperSize === 'A5' ? ' -o media=a5' : ' -o media=a4';
-    cmd += ' -o MediaType=PSGLOS_HIGH';
-    if (isHorizontal) cmd += ' -o landscape';
-    cmd += ' -o fit-to-page';
-    cmd += ` "${filepath}"`;
-    exec(cmd, (error, stdout, stderr) => {
-      if (error) reject(new Error(stderr || error.message));
-      else resolve(stdout.trim());
+// Crea un canvas A4 con la foto en la mitad superior (A5 landscape), devuelve PDF
+async function prepareA5Canvas(filepath) {
+  const A4_W = 2480, A4_H = 3508;
+  const A5_W = 2480, A5_H = 1748;
+
+  const resized = await sharp(filepath)
+    .resize(A5_W, A5_H, { fit: 'cover', position: 'centre' })
+    .toBuffer();
+
+  const base = filepath.replace(/\.[^.]+$/, '') + `_a5_${Date.now()}`;
+  const tempJpeg = base + '.jpg';
+  const tempPdf  = base + '.pdf';
+
+  await sharp({ create: { width: A4_W, height: A4_H, channels: 3, background: { r: 255, g: 255, b: 255 } } })
+    .composite([{ input: resized, top: 0, left: 0 }])
+    .jpeg({ quality: 95 })
+    .withMetadata({ density: 300 })
+    .toFile(tempJpeg);
+
+  await new Promise((resolve, reject) => {
+    exec(`img2pdf -o "${tempPdf}" "${tempJpeg}"`, (err) => {
+      try { fs.unlinkSync(tempJpeg); } catch(e) {}
+      if (err) reject(new Error('img2pdf falló: ' + err.message));
+      else resolve();
+    });
+  });
+
+  return tempPdf;
+}
+
+// Linux/Pi: verifica impresora disponible y luego imprime con CUPS
+function checkPrinterStatus(printerName) {
+  return new Promise((resolve) => {
+    exec(`lpstat -p "${printerName}" 2>&1`, (error, stdout) => {
+      const output = (stdout || '').toLowerCase();
+      if (output.includes('disabled') || output.includes('not accepting')) {
+        resolve({ available: false, reason: stdout.trim() });
+      } else if (output.includes('idle') || output.includes('ready') || output.includes('printing') || output.includes('enabled')) {
+        resolve({ available: true, reason: stdout.trim() });
+      } else if (error) {
+        resolve({ available: false, reason: `Impresora no encontrada: ${printerName}` });
+      } else {
+        // Si lpstat no da info clara, intentar igual
+        resolve({ available: true, reason: stdout.trim() });
+      }
     });
   });
 }
 
-// Función unificada — elige según SO automáticamente
+function printWithCUPS(filepath, printerName, options = {}) {
+  return new Promise(async (resolve, reject) => {
+    const safeName = (printerName && /^[a-zA-Z0-9_-]+$/.test(printerName)) ? printerName : DEFAULT_PRINTER;
+
+    const status = await checkPrinterStatus(safeName);
+    if (!status.available) {
+      console.error(`[CUPS] ❌ Impresora no disponible: ${status.reason}`);
+      return reject(new Error(`Impresora no disponible: ${status.reason}`));
+    }
+
+    let printPath = filepath;
+    let tempFile = null;
+    if (options.size === 'a5') {
+      console.log(`[CUPS] Preparando canvas A5...`);
+      tempFile = await prepareA5Canvas(filepath);
+      printPath = tempFile;
+    }
+
+    const mediaType = options.mediaType || 'PMPHOTO_NORMAL';
+    const quality = options.quality || 'Normal';
+    const safePath = printPath.replace(/'/g, "'\\''");
+    const cmd = `lp -d '${safeName}' -o MediaType=${mediaType} -o PrintQuality=${quality} '${safePath}'`;
+    console.log(`[CUPS] cmd: ${cmd}`);
+
+    exec(cmd, (error, stdout, stderr) => {
+      if (tempFile) try { fs.unlinkSync(tempFile); } catch(e) {}
+      if (error) {
+        console.error(`[CUPS] ❌ Error lp: ${stderr || error.message}`);
+        reject(new Error(stderr || error.message));
+      } else {
+        const jobId = stdout.trim();
+        console.log(`[CUPS] ✅ Trabajo enviado: ${jobId}`);
+        resolve(jobId);
+      }
+    });
+  });
+}
+
 function printFile(filepath, printerName, options = {}) {
   if (IS_WINDOWS) return printWithPS(filepath, printerName, options);
   return printWithCUPS(filepath, printerName, options);
@@ -293,7 +360,7 @@ app.delete('/api/photos/:filename', (req, res) => {
   res.json({ success: true });
 });
 
-// Imprimir foto — CUPS
+// Imprimir foto — idéntico al print-agent: foto original directo a CUPS
 app.post('/api/print', async (req, res) => {
   const { filename, printer, size } = req.body;
 
@@ -308,226 +375,27 @@ app.post('/api/print', async (req, res) => {
   if (!fs.existsSync(filepath)) filepath = path.join(UPLOADS_DIR, filename);
   if (!fs.existsSync(filepath)) return res.status(404).json({ error: 'Archivo no encontrado' });
 
-  const printSize = size || 'A4';
-  const isHorizontal = photo.isHorizontal || false;
-  const orientation = isHorizontal ? 'Landscape' : 'Portrait';
-
-  console.log(`[PRINT] ${filename} -> ${printer || 'default'} (${printSize} ${orientation})`);
+  console.log(`[PRINT] ${filename} -> ${printer || 'default'} (${size || 'a4'})`);
 
   try {
-    await printFile(filepath, printer, { paperSize: printSize, isHorizontal });
+    const jobId = await printFile(filepath, printer, { size });
 
     const db2 = loadDB();
     if (db2.photos[filename]) db2.photos[filename].printed++;
     db2.stats.totalPrinted++;
     saveDB(db2);
 
-    res.json({ success: true, message: `Enviado a imprimir (${printSize} ${orientation})` });
+    res.json({ success: true, message: 'Enviado a imprimir', job: jobId });
   } catch (err) {
     console.error('[PRINT ERROR]', err.message);
     res.status(500).json({ error: 'Error al imprimir', detail: err.message });
   }
 });
 
-// Imprimir HD — procesa el archivo original en el server (sin canvas del navegador)
-app.post('/api/print-hd', async (req, res) => {
-  const { filename, size, rotation = 0, zoom = 1, offsetX = 0, offsetY = 0, printer } = req.body;
-
-  console.log(`[PRINT-HD] Recibido: filename="${filename}", size="${size}", rotation=${rotation}, zoom=${zoom}`);
-
-  if (!filename) return res.status(400).json({ error: 'Falta filename' });
-
-  const db = loadDB();
-  const photo = db.photos[filename];
-  if (!photo) {
-    console.error(`[PRINT-HD] Foto no encontrada en BD:`, Object.keys(db.photos).slice(0, 5));
-    return res.status(404).json({ error: 'Foto no encontrada en BD' });
-  }
-
-  const date = photo.date || getToday();
-  let filepath = path.join(UPLOADS_DIR, date, filename);
-  console.log(`[PRINT-HD] Buscando archivo: ${filepath}`);
-
-  if (!fs.existsSync(filepath)) {
-    filepath = path.join(UPLOADS_DIR, filename);
-    console.log(`[PRINT-HD] Intento fallido. Buscando en ruta alternativa: ${filepath}`);
-  }
-
-  if (!fs.existsSync(filepath)) {
-    console.error(`[PRINT-HD] Archivo no encontrado:`, filepath);
-    return res.status(404).json({ error: 'Archivo no encontrado', path: filepath });
-  }
-
-  const stats = fs.statSync(filepath);
-  console.log(`[PRINT-HD] Archivo encontrado: ${filepath} (${stats.size} bytes)`);
-
-  const printSize = size || 'A4';
-  // Dimensiones de salida 300dpi: A4=2480×3508, A5=2480×1754 (mitad superior apaisada)
-  const OUT = printSize === 'A5' ? { w: 2480, h: 1754 } : { w: 2480, h: 3508 };
-  // Preview del modal: A4=200×283, A5=200×141
-  const PREVIEW_W = 200;
-  const scaleHD = OUT.w / PREVIEW_W; // 12.4
-
-  let finalPath = path.join(__dirname, `hd_${Date.now()}.jpg`);
-
-  try {
-    // 1. Auto-rotar por EXIF
-    console.log(`[PRINT-HD] 1. Leyendo con Sharp y detectando EXIF...`);
-    let imgBuf = await sharp(filepath).rotate().toBuffer();
-    console.log(`[PRINT-HD] 1. OK - Buffer generado (${imgBuf.length} bytes)`);
-
-    // 2. Rotación del usuario (si la hay)
-    if (rotation !== 0) {
-      console.log(`[PRINT-HD] 2. Aplicando rotación del usuario: ${rotation}°`);
-      imgBuf = await sharp(imgBuf)
-        .rotate(rotation, { background: { r: 255, g: 255, b: 255, alpha: 1 } })
-        .toBuffer();
-      console.log(`[PRINT-HD] 2. OK - Rotación aplicada`);
-    }
-
-    console.log(`[PRINT-HD] 3. Leyendo metadata...`);
-    const meta = await sharp(imgBuf).metadata();
-    console.log(`[PRINT-HD] 3. OK - Metadata: ${meta.width}x${meta.height} (${meta.format})`);
-
-    // 3. Escalar imagen para salida HD
-    const scaledW = Math.max(1, Math.round(meta.width * zoom * scaleHD));
-    const scaledH = Math.max(1, Math.round(meta.height * zoom * scaleHD));
-
-    const scaledBuf = await sharp(imgBuf)
-      .resize(scaledW, scaledH)
-      .toBuffer();
-
-    // 4. Posición: centro del papel + offset (escalado a HD)
-    let compLeft = Math.round(OUT.w / 2 + offsetX * scaleHD - scaledW / 2);
-    let compTop = Math.round(OUT.h / 2 + offsetY * scaleHD - scaledH / 2);
-
-    // 5. Si la imagen se sale del canvas (posiciones negativas), recortar la parte visible
-    let compBuf = scaledBuf;
-    if (compLeft < 0 || compTop < 0) {
-      const cropLeft = Math.max(0, -compLeft);
-      const cropTop = Math.max(0, -compTop);
-      const cropW = Math.min(scaledW - cropLeft, OUT.w);
-      const cropH = Math.min(scaledH - cropTop, OUT.h);
-      if (cropW > 0 && cropH > 0) {
-        compBuf = await sharp(scaledBuf)
-          .extract({ left: cropLeft, top: cropTop, width: cropW, height: cropH })
-          .toBuffer();
-      }
-      compLeft = Math.max(0, compLeft);
-      compTop = Math.max(0, compTop);
-    }
-
-    // 6. Componer sobre canvas blanco
-    await sharp({
-      create: { width: OUT.w, height: OUT.h, channels: 3, background: { r: 255, g: 255, b: 255 } }
-    })
-      .composite([{ input: compBuf, left: compLeft, top: compTop }])
-      .jpeg({ quality: 100 })
-      .toFile(finalPath);
-
-    // 7. Para A5: montar en A4 completo (mitad superior)
-    if (printSize === 'A5') {
-      const a5Buf = fs.readFileSync(finalPath);
-      await sharp({
-        create: { width: 2480, height: 3508, channels: 3, background: { r: 255, g: 255, b: 255 } }
-      })
-        .composite([{ input: a5Buf, top: 0, left: 0 }])
-        .jpeg({ quality: 100 })
-        .toFile(finalPath);
-    }
-
-    // 8. Imprimir siempre como A4 físico
-    await printFile(finalPath, printer, { paperSize: 'A4', isHorizontal: false });
-
-    const db2 = loadDB();
-    if (db2.photos[filename]) db2.photos[filename].printed++;
-    db2.stats.totalPrinted++;
-    saveDB(db2);
-
-    console.log(`[PRINT-HD] ✅ ${filename} -> ${printSize} rot=${rotation} zoom=${zoom?.toFixed(3)} (original HD)`);
-    res.json({ success: true, message: `Imprimiendo ${printSize} (calidad HD original)` });
-  } catch (err) {
-    console.error('[PRINT-HD ERROR] Excepción completa:');
-    console.error('  Mensaje:', err.message);
-    console.error('  Stack:', err.stack);
-    if (err.code) console.error('  Código:', err.code);
-    res.status(500).json({ error: 'Error al procesar imagen', detail: err.message, code: err.code });
-  } finally {
-    if (finalPath && fs.existsSync(finalPath)) {
-      try { fs.unlinkSync(finalPath); } catch(e) {}
-    }
-  }
-});
-
-// Imprimir con recorte personalizado (desde canvas del modal) — LEGACY
-// Imprimir con recorte del canvas
-app.post('/api/print-crop', async (req, res) => {
-  const { filename, size, cropDataURL, printer } = req.body;
-  if (!filename || !cropDataURL) return res.status(400).json({ error: 'Faltan datos' });
-
-  const db = loadDB();
-  const photo = db.photos[filename];
-  if (!photo) return res.status(404).json({ error: 'Foto no encontrada' });
-
-  const date = photo.date || getToday();
-  let origPath = path.join(UPLOADS_DIR, date, filename);
-  if (!fs.existsSync(origPath)) origPath = path.join(UPLOADS_DIR, filename);
-  if (!fs.existsSync(origPath)) return res.status(404).json({ error: 'Archivo no encontrado' });
-
-  const printSize = size || 'A4';
-  let finalPath = null;
-
-  try {
-    // Decodificar el canvas
-    const base64 = cropDataURL.replace(/^data:image\/\w+;base64,/, '');
-    const buffer = Buffer.from(base64, 'base64');
-
-    // Detectar formato (JPEG o PNG)
-    const isPNG = cropDataURL.startsWith('data:image/png');
-    const ext = isPNG ? 'png' : 'jpg';
-    finalPath = path.join(__dirname, `crop_${Date.now()}.${ext}`);
-
-    if (printSize === 'A5') {
-      // A5 = mitad superior de A4 físico (21x~15cm, apaisado)
-      // El canvas manda 2480x1754. Lo montamos arriba de un A4 blanco (2480x3508)
-      // y mandamos a CUPS como A4 para que quede en la mitad superior.
-      const cropBuffer = isPNG ? buffer : await sharp(buffer).png().toBuffer();
-      await sharp({
-        create: { width: 2480, height: 3508, channels: 3, background: { r: 255, g: 255, b: 255 } }
-      })
-        .composite([{ input: cropBuffer, top: 0, left: 0 }])
-        .png()
-        .toFile(finalPath);
-
-      await printFile(finalPath, printer, { paperSize: 'A4', isHorizontal: false });
-    } else {
-      // A4: guardar y mandar directo
-      if (isPNG) {
-        fs.writeFileSync(finalPath, buffer);
-      } else {
-        await sharp(buffer)
-          .jpeg({ quality: 100, mozjpeg: true })
-          .toFile(finalPath);
-      }
-
-      await printFile(finalPath, printer, { paperSize: 'A4', isHorizontal: false });
-    }
-
-    const db2 = loadDB();
-    if (db2.photos[filename]) db2.photos[filename].printed++;
-    db2.stats.totalPrinted++;
-    saveDB(db2);
-
-    console.log(`[PRINT-CROP] ${filename} -> ${printSize} (${ext.toUpperCase()} calidad máxima)`);
-    res.json({ success: true, message: `Enviado (${printSize} - calidad máxima)` });
-  } catch (err) {
-    console.error('[PRINT-CROP ERROR]', err.message);
-    res.status(500).json({ error: 'Error al imprimir', detail: err.message });
-  } finally {
-    if (finalPath && fs.existsSync(finalPath)) {
-      try { fs.unlinkSync(finalPath); } catch(e) {}
-    }
-  }
+// Mantener /api/print-hd y /api/print-crop como alias
+app.post('/api/print-hd', (req, res) => {
+  req.body.printer = req.body.printer || 'EPSON_L805';
+  return app._router.handle(Object.assign(req, { url: '/api/print', method: 'POST' }), res, () => {});
 });
 
 // Imprimir hoja índice — CUPS
@@ -701,6 +569,18 @@ app.get('/api/stats', (req, res) => {
   res.json(db.stats);
 });
 
+app.get('/api/camera/status', (req, res) => {
+  try {
+    if (fs.existsSync('/tmp/camara_status.json')) {
+      res.json(JSON.parse(fs.readFileSync('/tmp/camara_status.json', 'utf8')));
+    } else {
+      res.json({ state: 'offline', message: 'Monitor no iniciado' });
+    }
+  } catch(e) {
+    res.json({ state: 'offline', message: 'Error leyendo estado' });
+  }
+});
+
 // Listar impresoras
 app.get('/api/printers', (req, res) => {
   if (IS_WINDOWS) {
@@ -764,12 +644,278 @@ app.post('/api/print-queue/prioritize', (req, res) => {
   });
 });
 
+// Estado detallado de la impresora — combina lpstat + log CUPS
+app.get('/api/printer-status', (req, res) => {
+  if (IS_WINDOWS) return res.json({ status: 'unknown', message: 'Windows', available: true });
+  const printer = DEFAULT_PRINTER || 'EPSON_L805';
+
+  // Correr los tres queries en paralelo
+  Promise.all([
+    // 1. Estado básico CUPS
+    new Promise(resolve => exec(`lpstat -p "${printer}" 2>&1`, (e, o) => resolve(o || ''))),
+    // 2. Últimas 60 líneas del log buscando errores de hardware
+    new Promise(resolve => exec('tail -60 /var/log/cups/error_log 2>/dev/null', (e, o) => resolve(o || ''))),
+    // 3. Cola actual
+    new Promise(resolve => exec('lpstat -o 2>/dev/null', (e, o) => resolve(o || ''))),
+  ]).then(([lpOut, logOut, queueOut]) => {
+    const out = lpOut.trim();
+    let status = 'unknown';
+    let printingJob = null;
+    let alerts = [];
+
+    // Estado CUPS
+    if (out.includes('is idle')) status = 'idle';
+    else if (out.includes('now printing')) {
+      status = 'printing';
+      const m = out.match(/printing (\S+?)\./);
+      if (m) printingJob = m[1];
+    } else if (out.includes('stopped') || out.includes('disabled') || out.includes('not ready')) {
+      status = 'error';
+    }
+
+    // Parsear log — solo errores de los últimos 5 minutos
+    const logLines = logOut.split('\n');
+    const jobErrors = [];
+    let lastStateReason = 'none';
+    let paperEmpty = false;
+    let filterFail = false;
+    const RECENT_MS = 5 * 60 * 1000; // 5 minutos
+    const now = Date.now();
+
+    for (const line of logLines) {
+      if (!line.includes(printer) && !line.includes('Job')) continue;
+
+      // Extraer timestamp del log: [27/May/2026:09:13:12 -0300]
+      const tsMatch = line.match(/\[(\d{2}\/\w+\/\d{4}:\d{2}:\d{2}:\d{2})\s([+-]\d{4})\]/);
+      if (tsMatch) {
+        const parsed = new Date(`${tsMatch[1].replace(/\//g, ' ').replace(/:/, ' ')} ${tsMatch[2]}`);
+        if (!isNaN(parsed) && (now - parsed.getTime()) > RECENT_MS) continue; // ignorar si >5min
+      }
+
+      if (line.includes('printer-state-reasons=') && !line.includes('=none')) {
+        const m = line.match(/printer-state-reasons=(\S+)/);
+        if (m) lastStateReason = m[1];
+      }
+      if (/media.empty|media.needed|out.of.paper|no.paper|paper.out/i.test(line)) {
+        paperEmpty = true;
+        if (!alerts.includes('Sin papel')) alerts.push('Sin papel — revisá la bandeja');
+      }
+      if (/imagetoraster.*status 1|filter.*stopped.*status 1|The print file could not/i.test(line)) {
+        filterFail = true;
+      }
+      if (/ERROR.*Job|Job.*ERROR/i.test(line)) {
+        const m = line.match(/\[Job (\d+)\].*?ERROR[:\s]+(.{0,80})/i);
+        if (m && !jobErrors.includes(m[2])) jobErrors.push(`Job ${m[1]}: ${m[2].trim()}`);
+      }
+    }
+
+    // Detectar trabajo stuck en cola
+    const queueJobs = queueOut.trim().split('\n').filter(Boolean);
+    const stuckJobs = queueJobs.filter(l => {
+      const dateMatch = l.match(/(\w{3} \d{1,2} \w{3} \d{4})/);
+      if (!dateMatch) return false;
+      const jobDate = new Date(dateMatch[0]);
+      return (Date.now() - jobDate.getTime()) > 5 * 60 * 1000; // >5 min = stuck
+    });
+
+    if (filterFail) alerts.push('Error de filtro (imagetoraster) — convertir foto');
+    if (stuckJobs.length) alerts.push(`${stuckJobs.length} trabajo(s) posiblemente atascado(s)`);
+    if (lastStateReason !== 'none') alerts.push(`Estado impresora: ${lastStateReason}`);
+
+    // Si CUPS dice idle pero hay alertas del log, promover a warning
+    if (status === 'idle' && alerts.length) status = 'warning';
+
+    res.json({
+      status,
+      message: out,
+      printing_job: printingJob,
+      printer,
+      available: !['error'].includes(status),
+      alerts,
+      last_state_reason: lastStateReason,
+      paper_empty: paperEmpty,
+      filter_error: filterFail,
+      queue_count: queueJobs.filter(Boolean).length,
+    });
+  });
+});
+
 // Servir archivos
+// =================== FOTOS CÁMARA ===================
+const FOTOS_DIR = path.join(__dirname, 'uploads');
+const FOTO_EXT = new Set(['.jpg', '.jpeg', '.png', '.arw', '.cr2', '.nef', '.raw']);
+
+function esFoto(nombre) {
+  return FOTO_EXT.has(path.extname(nombre).toLowerCase());
+}
+
+// Listar carpetas
+app.get('/api/fotos', (req, res) => {
+  if (!fs.existsSync(FOTOS_DIR)) return res.json([]);
+  const items = fs.readdirSync(FOTOS_DIR);
+  const carpetas = [];
+  // Fotos sueltas en raíz
+  const sueltas = items.filter(f => {
+    try { return fs.statSync(path.join(FOTOS_DIR, f)).isFile() && esFoto(f); } catch { return false; }
+  });
+  if (sueltas.length) carpetas.push({ nombre: '_raiz', cantidad: sueltas.length });
+  // Subcarpetas
+  items.filter(f => {
+    try { return fs.statSync(path.join(FOTOS_DIR, f)).isDirectory(); } catch { return false; }
+  }).sort().reverse().forEach(dir => {
+    const fotos = fs.readdirSync(path.join(FOTOS_DIR, dir)).filter(esFoto);
+    carpetas.push({ nombre: dir, cantidad: fotos.length });
+  });
+  res.json(carpetas);
+});
+
+// Listar fotos de una carpeta
+app.get('/api/fotos/:carpeta', (req, res) => {
+  const base = req.params.carpeta === '_raiz' ? FOTOS_DIR : path.join(FOTOS_DIR, req.params.carpeta);
+  if (!fs.existsSync(base)) return res.status(404).json({ error: 'No encontrada' });
+  const fotos = fs.readdirSync(base).filter(f => {
+    try { return fs.statSync(path.join(base, f)).isFile() && esFoto(f); } catch { return false; }
+  }).sort();
+  res.json({ carpeta: req.params.carpeta, fotos });
+});
+
+// Servir foto individual
+app.get('/api/fotos/:carpeta/imagen/:filename', (req, res) => {
+  const base = req.params.carpeta === '_raiz' ? FOTOS_DIR : path.join(FOTOS_DIR, req.params.carpeta);
+  const ruta = path.join(base, req.params.filename);
+  if (!ruta.startsWith(FOTOS_DIR) || !fs.existsSync(ruta)) return res.status(404).send('No encontrada');
+  res.sendFile(ruta);
+});
+
+// Descargar carpeta como ZIP usando comando zip del sistema
+app.get('/api/fotos/:carpeta/zip', (req, res) => {
+  const carpeta = req.params.carpeta;
+  const base = carpeta === '_raiz' ? FOTOS_DIR : path.join(FOTOS_DIR, carpeta);
+  if (!fs.existsSync(base)) return res.status(404).send('No encontrada');
+
+  const fotos = fs.readdirSync(base).filter(f => {
+    try { return fs.statSync(path.join(base, f)).isFile() && esFoto(f); } catch { return false; }
+  });
+  if (!fotos.length) return res.status(404).send('No hay fotos');
+
+  const nombreZip = `fotos_${carpeta}.zip`;
+  res.setHeader('Content-Disposition', `attachment; filename="${nombreZip}"`);
+  res.setHeader('Content-Type', 'application/zip');
+
+  const archivos = fotos.map(f => `"${path.join(base, f)}"`).join(' ');
+  const proc = exec(`zip -j - ${archivos}`);
+  proc.stdout.pipe(res);
+  proc.stderr.on('data', d => console.error('[ZIP]', d));
+  proc.on('error', err => { console.error('[ZIP error]', err); res.status(500).end(); });
+});
+
+// Página fotos cámara
+app.get('/fotos', (req, res) => res.sendFile(path.join(__dirname, 'public', 'fotos.html')));
+
+// Página cola de impresión
+app.get('/queue', (req, res) => res.sendFile(path.join(__dirname, 'public', 'queue.html')));
+
+// Limpiar estado: cancelar todo + re-habilitar impresora
+app.post('/api/printer-reset', (req, res) => {
+  const printer = DEFAULT_PRINTER || 'EPSON_L805';
+  exec(`cancel -a "${printer}" ; cupsenable "${printer}" ; cupsaccept "${printer}"`, (err, stdout, stderr) => {
+    res.json({ success: true, message: 'Cola limpiada e impresora re-habilitada' });
+  });
+});
+
+// Últimas líneas del log de CUPS (solo errores/warnings)
+app.get('/api/cups-log', (req, res) => {
+  exec('tail -40 /var/log/cups/error_log 2>/dev/null', (err, stdout) => {
+    if (err || !stdout) return res.json({ lines: [] });
+    const lines = stdout.trim().split('\n')
+      .filter(l => /\[Job|ERROR|WARN|imagetoraster|filter|stopped/.test(l))
+      .slice(-20);
+    res.json({ lines });
+  });
+});
+
+// Carrusel — fotos de la última N hora(s)
+app.get('/api/carrusel', (req, res) => {
+  const ahora = Date.now();
+  const horas = Math.max(0.5, Math.min(24, parseFloat(req.query.horas) || 1));
+  const limite = horas * 3600 * 1000;
+  const fotos = [];
+
+  if (!fs.existsSync(UPLOADS_DIR)) return res.json({ fotos: [], total: 0 });
+
+  function scanDir(dir) {
+    let items;
+    try { items = fs.readdirSync(dir); } catch(e) { return; }
+    for (const item of items) {
+      const full = path.join(dir, item);
+      try {
+        const stat = fs.statSync(full);
+        if (stat.isDirectory()) {
+          scanDir(full);
+        } else if (esFoto(item) && (ahora - stat.mtimeMs) <= limite) {
+          const rel = path.relative(UPLOADS_DIR, full).replace(/\\/g, '/');
+          const parts = rel.split('/');
+          const carpeta = parts.length > 1 ? parts[0] : '_raiz';
+          fotos.push({
+            filename: item,
+            carpeta,
+            url: `/uploads/${rel}`,
+            thumb: `/thumbs/${rel}`,
+            mtime: stat.mtimeMs,
+          });
+        }
+      } catch(e) {}
+    }
+  }
+
+  scanDir(UPLOADS_DIR);
+  fotos.sort((a, b) => a.mtime - b.mtime);
+  res.json({ fotos, total: fotos.length, horas });
+});
+
+app.get('/carrusel', (req, res) => res.sendFile(path.join(__dirname, 'public', 'carrusel.html')));
+
 app.use('/thumbs', express.static(THUMBS_DIR, { maxAge: '1h' }));
 app.use('/uploads', (req, res, next) => { res.set('Cache-Control', 'no-store'); next(); }, express.static(UPLOADS_DIR));
 
+// =================== PROXY WIFI MANAGER (/redes) ===================
+const http = require('http');
+const { createProxyMiddleware } = require('http-proxy-middleware');
+
+// Terminal web (/terminal → ttyd :7681)
+const terminalProxy = createProxyMiddleware({
+  target: 'http://localhost:7681',
+  changeOrigin: true,
+  ws: true,
+});
+app.use('/terminal', terminalProxy);
+
+app.use('/redes', (req, res) => {
+  const target = req.url || '/';
+  const options = {
+    hostname: 'localhost',
+    port: 80,
+    path: target,
+    method: req.method,
+    headers: { ...req.headers, host: 'localhost' },
+  };
+  const proxy = http.request(options, (proxyRes) => {
+    res.writeHead(proxyRes.statusCode, proxyRes.headers);
+    proxyRes.pipe(res, { end: true });
+  });
+  proxy.on('error', () => res.status(502).send('WiFi Manager no disponible'));
+  req.pipe(proxy, { end: true });
+});
+
 // =================== INICIAR ===================
-app.listen(PORT, '0.0.0.0', () => {
+const server = http.createServer(app);
+server.on('upgrade', (req, socket, head) => {
+  if (req.url.startsWith('/terminal')) {
+    req.url = req.url.replace(/^\/terminal/, '') || '/';
+    terminalProxy.upgrade(req, socket, head);
+  }
+});
+server.listen(PORT, '0.0.0.0', () => {
   const localIP = getLocalIP();
   console.log(`\n🖨️  FotoShow Print Server v3.0 (Windows)`);
   console.log(`   Local:    http://localhost:${PORT}`);

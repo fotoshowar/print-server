@@ -11,7 +11,7 @@ from pathlib import Path
 
 from config import settings
 from database import init_db
-from routers import galleries, printer, auth
+from routers import galleries, printer, auth, fotos
 
 # Logging
 logging.basicConfig(
@@ -42,6 +42,7 @@ app = FastAPI(
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(galleries.router, prefix="/api", tags=["galleries"])
 app.include_router(printer.router, prefix="/api/printer", tags=["printer"])
+app.include_router(fotos.router, prefix="/api", tags=["fotos"])
 
 # Static files
 static_dir = Path(__file__).parent / "static"
@@ -55,6 +56,16 @@ else:
 async def root():
     """Redirect to index.html"""
     return FileResponse("static/index.html")
+
+
+@app.get("/fotos")
+async def fotos_page():
+    return FileResponse("static/fotos.html")
+
+
+@app.get("/queue")
+async def queue_page():
+    return FileResponse("static/queue.html")
 
 
 @app.get("/health")

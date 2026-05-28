@@ -28,6 +28,14 @@ class PrintType(str, Enum):
     CONTACT_SHEET = "contact_sheet"
 
 
+class PaperType(str, Enum):
+    """Tipos de papel disponibles"""
+    PLAIN = "plain"
+    GLOSSY = "glossy"
+    MATTE = "matte"
+    PHOTO = "photo"
+
+
 class Gallery(Base):
     """Galería sincronizada desde fotoshow-v2"""
     __tablename__ = "galleries"
@@ -82,6 +90,7 @@ class PrintLog(Base):
     id = Column(Integer, primary_key=True)
     gallery_id = Column(Integer, ForeignKey("galleries.id"), nullable=True)
     print_type = Column(SQLEnum(PrintType), nullable=False)  # A4, A5, contact_sheet
+    paper_type = Column(SQLEnum(PaperType), default=PaperType.PLAIN)  # plain, glossy, matte, photo
     print_count = Column(Integer, default=1)  # Cuántas veces se imprimió
     printer_model = Column(String(100), default="EPSON_L805")
     print_quality = Column(String(50), default="high")  # high, medium, draft

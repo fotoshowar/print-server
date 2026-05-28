@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="es" data-bs-theme="dark">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <link rel="icon" type="image/x-icon" href="https://fotoshow.online/static/favicon.ico"/>
+  <title>Cola de Impresión — FotoShow Print</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet"/>
+  <style>
+    :root {
+      --fs-green: #ADFF2F;
+      --fs-green-dark: #7CFC00;
+      --fs-bg: #0a0a0a;
+      --fs-bg-card: #111;
+      --fs-bg-card2: #161616;
+      --fs-border: rgba(173,255,47,0.14);
+      --fs-text: #e2e8f0;
+      --fs-text-muted: rgba(226,232,240,0.55);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--fs-bg);
+      color: var(--fs-text);
+      min-height: 100vh;
+    }
+
+    /* ── Navbar ── */
+    .navbar {
+      background: var(--fs-bg);
+      border-bottom: 1px solid var(--fs-border);
+      padding: 0.75rem 1.25rem;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .navbar-brand {
+      display: flex; align-items: center; gap: 0.5rem;
+      font-weight: 900; font-size: 1.25rem;
+      color: white !important; text-decoration: none;
+    }
+    .navbar-brand img { height: 32px; }
+    .nav-link-item {
+      color: var(--fs-text-muted); text-decoration: none;
+      font-size: 0.9rem; padding: 0.3rem 0.7rem;
+      border-radius: 6px; transition: color 0.2s;
+    }
+    .nav-link-item:hover { color: var(--fs-text); }
+    .nav-link-item.active { color: var(--fs-green); }
+
+    /* ── Layout ── */
+    .main-content { padding: 1.5rem 1.25rem; max-width: 960px; margin: 0 auto; }
+
+    .page-title {
+      font-size: 1.5rem; font-weight: 900; margin-bottom: 0.25rem;
+    }
+    .page-subtitle { color: var(--fs-text-muted); font-size: 0.9rem; margin-bottom: 1.75rem; }
+
+    /* ── Status Card ── */
+    .status-card {
+      background: var(--fs-bg-card);
+      border: 1px solid var(--fs-border);
+      border-radius: 16px;
+      padding: 1.25rem 1.5rem;
+      margin-bottom: 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+
+    .printer-info { display: flex; align-items: center; gap: 1rem; }
+
+    .status-dot {
+      width: 12px; height: 12px; border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .status-dot.idle { background: var(--fs-green); box-shadow: 0 0 8px var(--fs-green); }
+    .status-dot.printing {
+      background: #60a5fa;
+      box-shadow: 0 0 8px #60a5fa;
+      animation: pulse 1.2s ease-in-out infinite;
+    }
+    .status-dot.error { background: #f87171; box-shadow: 0 0 8px #f87171; }
+    .status-dot.unknown { background: #6b7280; }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.6; transform: scale(1.3); }
+    }
+
+    .printer-name { font-weight: 700; font-size: 1rem; }
+    .printer-state { font-size: 0.8rem; color: var(--fs-text-muted); margin-top: 0.15rem; }
+
+    .status-badge {
+      font-size: 0.75rem; font-weight: 700; padding: 0.3rem 0.8rem;
+      border-radius: 20px; text-transform: uppercase; letter-spacing: 0.05em;
+    }
+    .status-badge.idle { background: rgba(173,255,47,0.12); color: var(--fs-green); border: 1px solid rgba(173,255,47,0.25); }
+    .status-badge.printing { background: rgba(96,165,250,0.12); color: #60a5fa; border: 1px solid rgba(96,165,250,0.25); }
+    .status-badge.error { background: rgba(248,113,113,0.12); color: #f87171; border: 1px solid rgba(248,113,113,0.25); }
+    .status-badge.unknown { background: rgba(107,114,128,0.12); color: #9ca3af; border: 1px solid rgba(107,114,128,0.25); }
+
+    /* ── Toolbar ── */
+    .toolbar {
+      display: flex; align-items: center; justify-content: space-between;
+      flex-wrap: wrap; gap: 0.75rem; margin-bottom: 1rem;
+    }
+    .toolbar-left { display: flex; align-items: center; gap: 0.75rem; }
+
+    .queue-count {
+      font-size: 0.85rem; color: var(--fs-text-muted);
+    }
+    .queue-count strong { color: var(--fs-text); }
+
+    .auto-refresh-indicator {
+      font-size: 0.75rem; color: var(--fs-text-muted);
+      display: flex; align-items: center; gap: 0.4rem;
+    }
+    .refresh-ring {
+      width: 14px; height: 14px; border-radius: 50%;
+      border: 2px solid rgba(173,255,47,0.25);
+      border-top-color: var(--fs-green);
+      animation: spin 1.5s linear infinite;
+      display: none;
+    }
+    .refresh-ring.active { display: block; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .btn-fs {
+      background: var(--fs-green); color: #000; border: none;
+      font-weight: 700; padding: 0.45rem 1rem; border-radius: 8px;
+      font-size: 0.85rem; cursor: pointer; transition: opacity 0.15s;
+    }
+    .btn-fs:hover { opacity: 0.88; }
+    .btn-fs:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .btn-danger-soft {
+      background: rgba(248,113,113,0.1); color: #f87171;
+      border: 1px solid rgba(248,113,113,0.3);
+      font-weight: 600; padding: 0.45rem 1rem; border-radius: 8px;
+      font-size: 0.85rem; cursor: pointer; transition: background 0.15s;
+    }
+    .btn-danger-soft:hover { background: rgba(248,113,113,0.2); }
+    .btn-danger-soft:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* ── Jobs Table ── */
+    .jobs-container {
+      background: var(--fs-bg-card);
+      border: 1px solid var(--fs-border);
+      border-radius: 16px;
+      overflow: hidden;
+    }
+
+    .job-row {
+      display: grid;
+      grid-template-columns: 1fr auto auto auto;
+      align-items: center;
+      gap: 1rem;
+      padding: 1rem 1.25rem;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+      transition: background 0.15s;
+    }
+    .job-row:last-child { border-bottom: none; }
+    .job-row:hover { background: rgba(255,255,255,0.02); }
+    .job-row.is-printing { background: rgba(96,165,250,0.04); }
+
+    .job-id { font-family: monospace; font-size: 0.85rem; color: var(--fs-green); font-weight: 600; }
+    .job-meta { font-size: 0.75rem; color: var(--fs-text-muted); margin-top: 0.15rem; }
+
+    .job-size { font-size: 0.8rem; color: var(--fs-text-muted); white-space: nowrap; }
+    .job-date { font-size: 0.75rem; color: var(--fs-text-muted); white-space: nowrap; }
+
+    .job-status-badge {
+      font-size: 0.7rem; font-weight: 700; padding: 0.2rem 0.6rem;
+      border-radius: 12px; text-transform: uppercase; letter-spacing: 0.05em;
+      white-space: nowrap;
+    }
+    .job-status-badge.printing { background: rgba(96,165,250,0.15); color: #60a5fa; }
+    .job-status-badge.pending { background: rgba(107,114,128,0.15); color: #9ca3af; }
+
+    .btn-cancel-job {
+      background: rgba(248,113,113,0.08); color: #f87171;
+      border: 1px solid rgba(248,113,113,0.2);
+      font-size: 0.75rem; font-weight: 600;
+      padding: 0.25rem 0.65rem; border-radius: 6px;
+      cursor: pointer; transition: background 0.15s; white-space: nowrap;
+    }
+    .btn-cancel-job:hover { background: rgba(248,113,113,0.18); }
+
+    /* ── Empty state ── */
+    .empty-state {
+      text-align: center; padding: 3.5rem 1.25rem;
+      color: var(--fs-text-muted);
+    }
+    .empty-icon { font-size: 2.5rem; margin-bottom: 0.75rem; }
+    .empty-title { font-weight: 700; margin-bottom: 0.25rem; color: var(--fs-text); }
+
+    /* ── Toast ── */
+    .toast-container {
+      position: fixed; top: 1rem; right: 1rem; z-index: 9999;
+      display: flex; flex-direction: column; gap: 0.5rem;
+    }
+    .toast-msg {
+      background: #1e1e1e; border: 1px solid rgba(255,255,255,0.1);
+      padding: 0.75rem 1.1rem; border-radius: 10px;
+      font-size: 0.85rem; font-weight: 500;
+      animation: slide-in 0.2s ease;
+      display: flex; align-items: center; gap: 0.5rem;
+      min-width: 220px;
+    }
+    .toast-msg.success { border-color: rgba(173,255,47,0.3); }
+    .toast-msg.error { border-color: rgba(248,113,113,0.3); color: #f87171; }
+    @keyframes slide-in { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
+
+    /* ── History section ── */
+    .section-title {
+      font-size: 1rem; font-weight: 700; margin-bottom: 0.75rem;
+      margin-top: 2rem;
+    }
+
+    .history-card {
+      background: var(--fs-bg-card);
+      border: 1px solid var(--fs-border);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .history-row {
+      display: grid;
+      grid-template-columns: auto 1fr auto auto;
+      align-items: center;
+      gap: 1rem;
+      padding: 0.75rem 1.25rem;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      font-size: 0.82rem;
+    }
+    .history-row:last-child { border-bottom: none; }
+
+    .history-id { font-family: monospace; color: var(--fs-text-muted); font-size: 0.75rem; }
+    .history-detail { color: var(--fs-text); }
+    .history-meta { color: var(--fs-text-muted); font-size: 0.75rem; }
+    .history-time { color: var(--fs-text-muted); font-size: 0.75rem; white-space: nowrap; }
+
+    @media (max-width: 600px) {
+      .job-row { grid-template-columns: 1fr auto; }
+      .job-size, .job-status-badge { display: none; }
+      .history-row { grid-template-columns: 1fr auto; }
+      .history-id, .history-meta { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Navbar ── -->
+<nav class="navbar">
+  <div class="container-fluid px-3 d-flex align-items-center justify-content-between">
+    <a class="navbar-brand" href="/">
+      <img src="https://fotoshow.online/static/logo.png" alt="FotoShow"/>
+      <span>Foto<span style="color: var(--fs-green)">Show</span> Print</span>
+    </a>
+    <div style="display: flex; gap: 0.25rem; align-items: center;">
+      <a href="/" class="nav-link-item">Galerías</a>
+      <a href="/fotos" class="nav-link-item">Cámara</a>
+      <a href="/queue" class="nav-link-item active">Cola</a>
+    </div>
+  </div>
+</nav>
+
+<!-- ── Toast container ── -->
+<div id="toast-container" class="toast-container"></div>
+
+<!-- ── Main ── -->
+<div class="main-content">
+
+  <div class="page-title"><i class="bi bi-printer" style="color: var(--fs-green); margin-right: 0.4rem;"></i>Cola de impresión</div>
+  <div class="page-subtitle">Estado y trabajos activos en EPSON L805</div>
+
+  <!-- Printer status card -->
+  <div class="status-card" id="status-card">
+    <div class="printer-info">
+      <div class="status-dot unknown" id="status-dot"></div>
+      <div>
+        <div class="printer-name" id="printer-name">EPSON_L805</div>
+        <div class="printer-state" id="printer-state">Conectando...</div>
+      </div>
+    </div>
+    <div style="display: flex; align-items: center; gap: 1rem;">
+      <span class="status-badge unknown" id="status-badge">—</span>
+      <div class="auto-refresh-indicator">
+        <div class="refresh-ring active" id="refresh-ring"></div>
+        <span id="refresh-countdown">actualizando...</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toolbar -->
+  <div class="toolbar">
+    <div class="toolbar-left">
+      <span class="queue-count">
+        Cola: <strong id="job-count">—</strong> trabajo(s)
+      </span>
+    </div>
+    <div style="display: flex; gap: 0.5rem;">
+      <button class="btn-fs" onclick="refreshQueue()" id="btn-refresh">
+        <i class="bi bi-arrow-clockwise me-1"></i>Actualizar
+      </button>
+      <button class="btn-danger-soft" onclick="cancelAll()" id="btn-cancel-all" disabled>
+        <i class="bi bi-x-circle me-1"></i>Cancelar todo
+      </button>
+    </div>
+  </div>
+
+  <!-- Jobs list -->
+  <div class="jobs-container" id="jobs-container">
+    <div class="empty-state">
+      <div class="refresh-ring active" style="margin: 0 auto 1rem; display: block; width: 24px; height: 24px;"></div>
+      <p>Cargando cola...</p>
+    </div>
+  </div>
+
+  <!-- History -->
+  <div class="section-title"><i class="bi bi-clock-history me-2" style="color: var(--fs-text-muted);"></i>Historial reciente</div>
+  <div class="history-card" id="history-container">
+    <div class="empty-state" style="padding: 2rem;">
+      <p style="color: var(--fs-text-muted); font-size: 0.85rem;">Cargando historial...</p>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  const REFRESH_INTERVAL = 4000;
+  let refreshTimer = null;
+  let countdownTimer = null;
+  let nextRefresh = Date.now() + REFRESH_INTERVAL;
+  let currentJobs = [];
+
+  // ── Init ──────────────────────────────────────────────────────────────────
+
+  document.addEventListener('DOMContentLoaded', () => {
+    refreshQueue();
+    loadHistory();
+    startAutoRefresh();
+    startCountdown();
+  });
+
+  // ── Auto refresh ──────────────────────────────────────────────────────────
+
+  function startAutoRefresh() {
+    refreshTimer = setInterval(() => {
+      refreshQueue();
+      nextRefresh = Date.now() + REFRESH_INTERVAL;
+    }, REFRESH_INTERVAL);
+  }
+
+  function startCountdown() {
+    countdownTimer = setInterval(() => {
+      const secs = Math.max(0, Math.round((nextRefresh - Date.now()) / 1000));
+      document.getElementById('refresh-countdown').textContent = `en ${secs}s`;
+    }, 500);
+  }
+
+  // ── Queue fetch ───────────────────────────────────────────────────────────
+
+  async function refreshQueue() {
+    const ring = document.getElementById('refresh-ring');
+    ring.classList.add('active');
+    try {
+      const resp = await fetch('/api/printer/queue');
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const data = await resp.json();
+      renderPrinterStatus(data.printer || {});
+      renderJobs(data.jobs || []);
+      document.getElementById('job-count').textContent = data.count ?? 0;
+      document.getElementById('btn-cancel-all').disabled = (data.count === 0);
+      currentJobs = data.jobs || [];
+    } catch (err) {
+      console.error('Error refreshing queue:', err);
+      renderPrinterStatus({ status: 'error', message: err.message });
+    } finally {
+      ring.classList.remove('active');
+      nextRefresh = Date.now() + REFRESH_INTERVAL;
+    }
+  }
+
+  // ── Render printer status ─────────────────────────────────────────────────
+
+  function renderPrinterStatus(printer) {
+    const dot = document.getElementById('status-dot');
+    const badge = document.getElementById('status-badge');
+    const state = document.getElementById('printer-state');
+    const name = document.getElementById('printer-name');
+
+    const status = printer.status || 'unknown';
+    const labels = { idle: 'Disponible', printing: 'Imprimiendo', error: 'Error', unknown: 'Desconocido' };
+    const label = labels[status] || status;
+
+    dot.className = `status-dot ${status}`;
+    badge.className = `status-badge ${status}`;
+    badge.textContent = label;
+    name.textContent = printer.printer || 'EPSON_L805';
+    state.textContent = printer.message || '';
+
+    if (status === 'printing' && printer.printing_job) {
+      state.textContent += ` — ${printer.printing_job}`;
+    }
+  }
+
+  // ── Render jobs ───────────────────────────────────────────────────────────
+
+  function renderJobs(jobs) {
+    const container = document.getElementById('jobs-container');
+
+    if (!jobs || jobs.length === 0) {
+      container.innerHTML = `
+        <div class="empty-state">
+          <div class="empty-icon"><i class="bi bi-check-circle" style="color: var(--fs-green);"></i></div>
+          <div class="empty-title">Cola vacía</div>
+          <div style="font-size: 0.85rem; margin-top: 0.25rem;">No hay trabajos pendientes</div>
+        </div>`;
+      return;
+    }
+
+    container.innerHTML = jobs.map(job => `
+      <div class="job-row ${job.status === 'printing' ? 'is-printing' : ''}" id="job-${job.job_id}">
+        <div>
+          <div class="job-id">${escapeHtml(job.job_id)}</div>
+          <div class="job-meta">Usuario: ${escapeHtml(job.user)} · ${escapeHtml(job.date)}</div>
+        </div>
+        <div class="job-size">${job.size_kb} KB</div>
+        <div>
+          <span class="job-status-badge ${job.status}">${job.status === 'printing' ? '▶ Imprimiendo' : 'En cola'}</span>
+        </div>
+        <button class="btn-cancel-job" onclick="cancelJob('${escapeHtml(job.job_id)}')">
+          <i class="bi bi-x"></i> Cancelar
+        </button>
+      </div>
+    `).join('');
+  }
+
+  // ── Actions ───────────────────────────────────────────────────────────────
+
+  async function cancelJob(jobId) {
+    const btn = event.target.closest('.btn-cancel-job');
+    if (btn) { btn.disabled = true; btn.textContent = 'Cancelando...'; }
+    try {
+      const resp = await fetch(`/api/printer/queue/${encodeURIComponent(jobId)}`, { method: 'DELETE' });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.detail || 'Error al cancelar');
+      showToast(`Trabajo ${jobId} cancelado`, 'success');
+      // Remover de la UI inmediatamente
+      const row = document.getElementById(`job-${jobId}`);
+      if (row) row.remove();
+      // Actualizar contador
+      const remaining = document.querySelectorAll('.job-row').length;
+      document.getElementById('job-count').textContent = remaining;
+      document.getElementById('btn-cancel-all').disabled = remaining === 0;
+    } catch (err) {
+      showToast(err.message, 'error');
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="bi bi-x"></i> Cancelar'; }
+    }
+  }
+
+  async function cancelAll() {
+    const btn = document.getElementById('btn-cancel-all');
+    btn.disabled = true;
+    btn.textContent = 'Cancelando...';
+    try {
+      const resp = await fetch('/api/printer/queue', { method: 'DELETE' });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.detail || 'Error al cancelar');
+      showToast('Todos los trabajos cancelados', 'success');
+      await refreshQueue();
+    } catch (err) {
+      showToast(err.message, 'error');
+      btn.disabled = false;
+      btn.innerHTML = '<i class="bi bi-x-circle me-1"></i>Cancelar todo';
+    }
+  }
+
+  // ── History ───────────────────────────────────────────────────────────────
+
+  async function loadHistory() {
+    try {
+      const resp = await fetch('/api/printer/history', {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('authToken') || ''}` }
+      });
+      if (!resp.ok) throw new Error('No autorizado');
+      const data = await resp.json();
+      renderHistory(data.history || []);
+    } catch (err) {
+      document.getElementById('history-container').innerHTML = `
+        <div class="empty-state" style="padding: 1.5rem;">
+          <p style="color: var(--fs-text-muted); font-size: 0.82rem;">${err.message === 'No autorizado' ? 'Iniciá sesión para ver el historial' : 'Error al cargar historial'}</p>
+        </div>`;
+    }
+  }
+
+  function renderHistory(logs) {
+    const container = document.getElementById('history-container');
+    if (!logs.length) {
+      container.innerHTML = `<div class="empty-state" style="padding: 1.5rem;"><p style="color: var(--fs-text-muted); font-size: 0.85rem;">Sin registros todavía</p></div>`;
+      return;
+    }
+    container.innerHTML = logs.map(log => {
+      const date = log.created_at ? new Date(log.created_at).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' }) : '—';
+      const paper = log.paper_type ? log.paper_type.charAt(0).toUpperCase() + log.paper_type.slice(1) : '—';
+      return `
+        <div class="history-row">
+          <div class="history-id">#${log.id}</div>
+          <div class="history-detail">
+            ${log.print_type || '—'} · ${paper}
+            ${log.notes ? `<span style="color: #f87171; font-size: 0.75rem; margin-left: 0.5rem;">⚠ ${escapeHtml(log.notes)}</span>` : ''}
+          </div>
+          <div class="history-meta">Cal: ${log.print_count ?? '—'} · ${log.print_quality || '—'}</div>
+          <div class="history-time">${date}</div>
+        </div>`;
+    }).join('');
+  }
+
+  // ── Toast ─────────────────────────────────────────────────────────────────
+
+  function showToast(message, type = 'success') {
+    const container = document.getElementById('toast-container');
+    const toast = document.createElement('div');
+    toast.className = `toast-msg ${type}`;
+    const icon = type === 'success' ? '✓' : '✗';
+    toast.innerHTML = `<span>${icon}</span><span>${escapeHtml(message)}</span>`;
+    container.appendChild(toast);
+    setTimeout(() => toast.remove(), 3500);
+  }
+
+  function escapeHtml(str) {
+    if (!str) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+</script>
+
+</body>
+</html>

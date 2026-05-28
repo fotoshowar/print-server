@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="es" data-bs-theme="dark">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <link rel="icon" type="image/x-icon" href="https://fotoshow.online/static/favicon.ico"/>
+  <title>FotoShow — Fotos Cámara</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet"/>
+  <style>
+    :root {
+      --fs-green: #ADFF2F;
+      --fs-bg: #0a0a0a;
+      --fs-bg-card: #111;
+      --fs-border: rgba(173,255,47,0.14);
+      --fs-text: #e2e8f0;
+      --fs-text-muted: rgba(226,232,240,0.55);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--fs-bg); color: var(--fs-text); min-height: 100vh; }
+    .navbar { background: var(--fs-bg); border-bottom: 1px solid var(--fs-border); padding: 0.75rem 1.25rem; position: sticky; top: 0; z-index: 100; }
+    .navbar-brand { display: flex; align-items: center; gap: 0.5rem; font-weight: 900; font-size: 1.25rem; color: white !important; text-decoration: none; }
+    .navbar-brand img { height: 32px; }
+    .nav-links { display: flex; gap: 1rem; }
+    .nav-links a { color: var(--fs-text-muted); text-decoration: none; font-size: 0.9rem; padding: 0.3rem 0.7rem; border-radius: 6px; transition: color 0.2s, background 0.2s; }
+    .nav-links a:hover, .nav-links a.active { color: var(--fs-green); background: rgba(173,255,47,0.08); }
+    .main { padding: 2rem 1.25rem; max-width: 1100px; margin: 0 auto; }
+    h2 { font-size: 1.4rem; font-weight: 900; margin-bottom: 1.5rem; }
+    .folder-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+    .folder-card { background: var(--fs-bg-card); border: 1px solid rgba(255,255,255,0.07); border-radius: 12px; padding: 1.2rem 1rem; cursor: pointer; transition: transform 0.2s, border-color 0.2s; text-align: center; }
+    .folder-card:hover { transform: translateY(-3px); border-color: var(--fs-border); }
+    .folder-card.active { border-color: var(--fs-green); background: rgba(173,255,47,0.05); }
+    .folder-icon { font-size: 2rem; margin-bottom: 0.5rem; }
+    .folder-name { font-weight: 700; font-size: 0.95rem; }
+    .folder-count { font-size: 0.78rem; color: var(--fs-text-muted); margin-top: 0.2rem; }
+    .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem; }
+    .btn-zip { background: var(--fs-green); color: #000; font-weight: 700; border: none; border-radius: 8px; padding: 0.5rem 1.2rem; cursor: pointer; font-size: 0.9rem; text-decoration: none; display: inline-flex; align-items: center; gap: 0.4rem; }
+    .btn-zip:hover { opacity: 0.85; }
+    .photo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 0.75rem; }
+    .photo-item { background: #1a1a1a; border-radius: 10px; overflow: hidden; aspect-ratio: 1; position: relative; cursor: pointer; }
+    .photo-item img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.2s; }
+    .photo-item:hover img { transform: scale(1.05); }
+    .photo-name { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,0.7); font-size: 0.65rem; color: #ccc; padding: 0.3rem 0.5rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .spinner { display: inline-block; width: 20px; height: 20px; border: 3px solid rgba(173,255,47,0.3); border-top-color: var(--fs-green); border-radius: 50%; animation: spin 0.8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    #lightbox { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.92); z-index: 999; align-items: center; justify-content: center; flex-direction: column; gap: 1rem; }
+    #lightbox.open { display: flex; }
+    #lightbox img { max-width: 90vw; max-height: 85vh; object-fit: contain; border-radius: 8px; }
+    #lightbox-close { position: absolute; top: 1rem; right: 1.5rem; font-size: 2rem; color: white; cursor: pointer; background: none; border: none; line-height: 1; }
+    #lightbox-name { color: var(--fs-text-muted); font-size: 0.85rem; }
+    #lightbox-dl { background: var(--fs-green); color: #000; font-weight: 700; border: none; border-radius: 8px; padding: 0.4rem 1rem; cursor: pointer; font-size: 0.85rem; text-decoration: none; }
+  </style>
+</head>
+<body>
+
+<nav class="navbar">
+  <div class="container-fluid px-3 d-flex align-items-center justify-content-between">
+    <a class="navbar-brand" href="/">
+      <img src="https://fotoshow.online/static/logo.png" alt="FotoShow"/>
+      <span>Foto<span style="color: var(--fs-green)">Show</span> Print</span>
+    </a>
+    <div class="nav-links">
+      <a href="/">Galerías</a>
+      <a href="/fotos" class="active">Fotos Cámara</a>
+    </div>
+  </div>
+</nav>
+
+<div class="main">
+  <h2>📷 Fotos de la cámara Sony</h2>
+
+  <!-- Carpetas -->
+  <div id="folders-loading" style="padding: 2rem 0;"><div class="spinner"></div></div>
+  <div id="folder-grid" class="folder-grid" style="display:none;"></div>
+
+  <!-- Fotos de la carpeta seleccionada -->
+  <div id="photos-section" style="display:none;">
+    <div class="section-header">
+      <h2 id="photos-title" style="margin-bottom:0;"></h2>
+      <a id="zip-btn" class="btn-zip" href="#" download>
+        <i class="bi bi-file-zip"></i> Descargar todo ZIP
+      </a>
+    </div>
+    <div id="photos-loading" style="padding: 2rem 0; display:none;"><div class="spinner"></div></div>
+    <div id="photo-grid" class="photo-grid"></div>
+  </div>
+</div>
+
+<!-- Lightbox -->
+<div id="lightbox">
+  <button id="lightbox-close" onclick="closeLightbox()">✕</button>
+  <img id="lightbox-img" src="" alt=""/>
+  <div style="display:flex; align-items:center; gap:1rem;">
+    <span id="lightbox-name"></span>
+    <a id="lightbox-dl" href="#" download>Descargar</a>
+  </div>
+</div>
+
+<script>
+  let carpetaActual = null;
+
+  async function cargarCarpetas() {
+    const res = await fetch('/api/fotos');
+    const carpetas = await res.json();
+    document.getElementById('folders-loading').style.display = 'none';
+    const grid = document.getElementById('folder-grid');
+    grid.style.display = 'grid';
+    grid.innerHTML = carpetas.map(c => `
+      <div class="folder-card" onclick="seleccionarCarpeta('${c.nombre}', this)">
+        <div class="folder-icon">📁</div>
+        <div class="folder-name">${c.nombre === '_raiz' ? 'Sin fecha' : c.nombre}</div>
+        <div class="folder-count">${c.cantidad} foto${c.cantidad !== 1 ? 's' : ''}</div>
+      </div>
+    `).join('');
+  }
+
+  async function seleccionarCarpeta(nombre, el) {
+    document.querySelectorAll('.folder-card').forEach(c => c.classList.remove('active'));
+    el.classList.add('active');
+    carpetaActual = nombre;
+
+    const section = document.getElementById('photos-section');
+    const grid = document.getElementById('photo-grid');
+    const loading = document.getElementById('photos-loading');
+    section.style.display = 'block';
+    grid.innerHTML = '';
+    loading.style.display = 'block';
+
+    document.getElementById('photos-title').textContent = nombre === '_raiz' ? 'Sin fecha' : nombre;
+    document.getElementById('zip-btn').href = `/api/fotos/${nombre}/zip`;
+
+    const res = await fetch(`/api/fotos/${nombre}`);
+    const data = await res.json();
+    loading.style.display = 'none';
+
+    grid.innerHTML = data.fotos.map(f => `
+      <div class="photo-item" onclick="abrirLightbox('${nombre}', '${f}')">
+        <img src="/api/fotos/${nombre}/imagen/${encodeURIComponent(f)}" loading="lazy" alt="${f}"/>
+        <div class="photo-name">${f}</div>
+      </div>
+    `).join('');
+
+    section.scrollIntoView({ behavior: 'smooth' });
+  }
+
+  function abrirLightbox(carpeta, filename) {
+    const url = `/api/fotos/${carpeta}/imagen/${encodeURIComponent(filename)}`;
+    document.getElementById('lightbox-img').src = url;
+    document.getElementById('lightbox-name').textContent = filename;
+    document.getElementById('lightbox-dl').href = url;
+    document.getElementById('lightbox-dl').download = filename;
+    document.getElementById('lightbox').classList.add('open');
+  }
+
+  function closeLightbox() {
+    document.getElementById('lightbox').classList.remove('open');
+    document.getElementById('lightbox-img').src = '';
+  }
+
+  document.getElementById('lightbox').addEventListener('click', e => {
+    if (e.target === document.getElementById('lightbox')) closeLightbox();
+  });
+
+  cargarCarpetas();
+</script>
+</body>
+</html>
