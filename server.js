@@ -11,6 +11,7 @@ const fs = require('fs');
 const { exec } = require('child_process');
 const crypto = require('crypto');
 const sharp = require('sharp');
+const https = require('https');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -266,6 +267,121 @@ function printFile(filepath, printerName, options = {}) {
   if (IS_WINDOWS) return printWithPS(filepath, printerName, options);
   return printWithCUPS(filepath, printerName, options);
 }
+
+// =================== CONFIG (auth) ===================
+
+const CONFIG_PATH = path.join(__dirname, 'config.json');
+
+function loadConfig() {
+  if (fs.existsSync(CONFIG_PATH)) return JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8'));
+  return {};
+}
+
+function saveConfig(cfg) {
+  fs.writeFileSync(CONFIG_PATH, JSON.stringify(cfg, null, 2));
+}
+
+// =================== RUTAS AUTH ===================
+
+// Callback que recibe el token de fotoshow.online tras el login con Google
+app.get('/auth/callback', (req, res) => {
+  const { token, name, id } = req.query;
+  if (!token) return res.status(400).send('Token faltante');
+
+  const cfg = loadConfig();
+  cfg.photographer = { id: parseInt(id), name: decodeURIComponent(name), token };
+  saveConfig(cfg);
+
+  const safeName = JSON.stringify(decodeURIComponent(name));
+  res.send(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Conectado</title>
+<style>body{font-family:sans-serif;background:#0a0a0a;color:#e2e8f0;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;flex-direction:column;gap:12px;}
+.ok{font-size:2rem;color:#ADFF2F;}</style></head><body>
+<div class="ok">✓</div><p>Conectado como <strong>${safeName.slice(1,-1)}</strong></p><p style="color:#666;font-size:0.85rem">Podés cerrar esta ventana.</p>
+<script>
+  try { window.opener && window.opener.postMessage({ type:'auth-success', name:${safeName} }, '*'); } catch(e){}
+  setTimeout(() => window.close(), 1500);
+</script></body></html>`);
+});
+
+app.get('/api/auth/status', (req, res) => {
+  const cfg = loadConfig();
+  if (cfg.photographer?.token) {
+    res.json({ connected: true, name: cfg.photographer.name, id: cfg.photographer.id });
+  } else {
+    res.json({ connected: false });
+  }
+});
+
+app.post('/api/auth/logout', (req, res) => {
+  const cfg = loadConfig();
+  delete cfg.photographer;
+  saveConfig(cfg);
+  res.json({ success: true });
+});
+
+// =================== RUTAS CLOUD (proxy a fotoshow.online) ===================
+
+const FOTOSHOW_BASE = process.env.FOTOSHOW_API_BASE || 'https://fotoshow.online';
+
+function getToken() {
+  return loadConfig().photographer?.token || null;
+}
+
+function cloudRequest(method, endpoint, body = null) {
+  const token = getToken();
+  if (!token) return Promise.reject(new Error('No autenticado'));
+
+  const bodyStr = body ? JSON.stringify(body) : null;
+
+  return new Promise((resolve, reject) => {
+    function doRequest(urlStr) {
+      const url = new URL(urlStr);
+      const options = {
+        hostname: url.hostname,
+        path: url.pathname + url.search,
+        method,
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+      };
+      if (bodyStr) options.headers['Content-Length'] = Buffer.byteLength(bodyStr);
+
+      const req = https.request(options, res => {
+        if (res.statusCode === 307 || res.statusCode === 301 || res.statusCode === 302) {
+          return doRequest(res.headers.location);
+        }
+        let data = '';
+        res.on('data', chunk => data += chunk);
+        res.on('end', () => {
+          try { resolve({ status: res.statusCode, body: JSON.parse(data) }); }
+          catch { resolve({ status: res.statusCode, body: data }); }
+        });
+      });
+      req.on('error', reject);
+      if (bodyStr) req.write(bodyStr);
+      req.end();
+    }
+    doRequest(FOTOSHOW_BASE + endpoint);
+  });
+}
+
+// Listar galerías del fotógrafo
+app.get('/api/cloud/galleries', async (req, res) => {
+  try {
+    const r = await cloudRequest('GET', '/api/galleries');
+    res.status(r.status).json(r.body);
+  } catch (err) {
+    res.status(401).json({ error: err.message });
+  }
+});
+
+// Crear galería
+app.post('/api/cloud/galleries', async (req, res) => {
+  try {
+    const r = await cloudRequest('POST', '/api/galleries', req.body);
+    res.status(r.status).json(r.body);
+  } catch (err) {
+    res.status(401).json({ error: err.message });
+  }
+});
 
 // =================== RUTAS API ===================
 

@@ -284,10 +284,28 @@
     <a href="/queue" style="color:rgba(226,232,240,0.5);text-decoration:none;font-size:0.82rem;padding:5px 10px;border-radius:6px;transition:color .15s;" onmouseover="this.style.color='#e2e8f0'" onmouseout="this.style.color='rgba(226,232,240,0.5)'">
       🖨 Cola
     </a>
+    <div id="authBadge" onclick="toggleAuthMenu()" style="cursor:pointer;display:flex;align-items:center;gap:6px;padding:5px 10px;border-radius:6px;border:1px solid var(--fs-border);font-size:0.78rem;font-weight:600;transition:background .15s;" title="Cuenta FotoShow">
+      <span id="authDot" style="width:7px;height:7px;border-radius:50%;background:#666;flex-shrink:0;"></span>
+      <span id="authLabel">Conectar</span>
+    </div>
   </div>
 </nav>
 
+<!-- Auth menu -->
+<div id="authMenu" style="display:none;position:fixed;top:52px;right:12px;z-index:3000;background:var(--fs-bg-card);border:1px solid var(--fs-border);border-radius:10px;padding:14px;min-width:200px;box-shadow:0 8px 32px rgba(0,0,0,0.4);">
+  <div id="authMenuContent"></div>
+</div>
+
 <div class="container">
+
+  <!-- Tabs -->
+  <div style="display:flex;gap:4px;margin-top:12px;margin-bottom:0;border-bottom:1px solid var(--fs-border);">
+    <button id="tabFotos" onclick="switchTab('fotos')" style="padding:8px 16px;background:transparent;border:none;border-bottom:2px solid var(--fs-green);color:var(--fs-green);font-size:0.82rem;font-weight:700;cursor:pointer;">Fotos</button>
+    <button id="tabGalerias" onclick="switchTab('galerias')" style="padding:8px 16px;background:transparent;border:none;border-bottom:2px solid transparent;color:var(--fs-muted);font-size:0.82rem;font-weight:700;cursor:pointer;">Galerías</button>
+  </div>
+
+  <!-- Panel Fotos -->
+  <div id="panelFotos">
 
   <!-- Status cards -->
   <div class="status-row" style="margin-top:12px;">
@@ -386,6 +404,80 @@
     <div id="indexPreviewContainer" style="background:white;border-radius:8px;padding:6px;margin-bottom:12px;max-height:40vh;overflow-y:auto;"></div>
     <button class="btn-neon" onclick="printIndex()"><i class="bi bi-printer"></i> Imprimir Índice</button>
     <button class="modal-close-btn" onclick="closeIndexModal()">Cancelar</button>
+  </div>
+</div>
+
+  </div><!-- /panelFotos -->
+
+  <!-- Panel Galerías -->
+  <div id="panelGalerias" style="display:none;padding-top:16px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+      <div style="font-size:0.9rem;font-weight:700;">Mis galerías</div>
+      <button onclick="openNewGalleryModal()" style="padding:7px 14px;background:var(--fs-green);color:#0a0a0a;border:none;border-radius:8px;font-size:0.82rem;font-weight:700;cursor:pointer;">+ Nueva</button>
+    </div>
+    <div id="galleriesList"><div style="color:var(--fs-muted);font-size:0.85rem;text-align:center;padding:24px;">Conectá tu cuenta para ver las galerías</div></div>
+  </div>
+
+</div><!-- /container -->
+
+<!-- Modal nueva galería -->
+<div class="fs-modal" id="newGalleryModal" onclick="if(event.target===this)closeNewGalleryModal()">
+  <div class="modal-card" style="max-width:480px;max-height:90vh;overflow-y:auto;">
+    <div class="modal-title"><i class="bi bi-collection"></i> <span id="gModalTitle">Nueva galería</span></div>
+
+    <div style="display:flex;flex-direction:column;gap:12px;">
+
+      <div>
+        <label style="font-size:0.75rem;font-weight:700;color:var(--fs-muted);display:block;margin-bottom:4px;">Nombre del evento *</label>
+        <input id="gName" type="text" placeholder="Maratón Ciudad 2026" style="width:100%;padding:10px;background:var(--fs-bg);border:1px solid var(--fs-border);border-radius:8px;color:var(--fs-text);font-size:0.9rem;box-sizing:border-box;">
+      </div>
+
+      <div>
+        <label style="font-size:0.75rem;font-weight:700;color:var(--fs-muted);display:block;margin-bottom:4px;">Descripción</label>
+        <textarea id="gDesc" rows="2" placeholder="Descripción del evento…" style="width:100%;padding:10px;background:var(--fs-bg);border:1px solid var(--fs-border);border-radius:8px;color:var(--fs-text);font-size:0.9rem;box-sizing:border-box;resize:vertical;"></textarea>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div>
+          <label style="font-size:0.75rem;font-weight:700;color:var(--fs-muted);display:block;margin-bottom:4px;">Ubicación</label>
+          <input id="gLocation" type="text" placeholder="Buenos Aires" style="width:100%;padding:10px;background:var(--fs-bg);border:1px solid var(--fs-border);border-radius:8px;color:var(--fs-text);font-size:0.9rem;box-sizing:border-box;">
+        </div>
+        <div>
+          <label style="font-size:0.75rem;font-weight:700;color:var(--fs-muted);display:block;margin-bottom:4px;">Fecha del evento</label>
+          <input id="gDate" type="date" style="width:100%;padding:10px;background:var(--fs-bg);border:1px solid var(--fs-border);border-radius:8px;color:var(--fs-text);font-size:16px;box-sizing:border-box;color-scheme:dark;">
+        </div>
+      </div>
+
+      <div>
+        <label style="font-size:0.75rem;font-weight:700;color:var(--fs-muted);display:block;margin-bottom:4px;">Precio por foto (ARS)</label>
+        <div style="display:flex;align-items:center;border:1px solid var(--fs-border);border-radius:8px;overflow:hidden;">
+          <span style="padding:10px 12px;background:rgba(255,255,255,0.05);color:var(--fs-muted);font-size:0.9rem;">$</span>
+          <input id="gPrice" type="number" min="0" step="100" value="1500" style="flex:1;padding:10px;background:var(--fs-bg);border:none;color:var(--fs-text);font-size:0.9rem;outline:none;">
+        </div>
+      </div>
+
+      <div>
+        <label style="font-size:0.75rem;font-weight:700;color:var(--fs-muted);display:block;margin-bottom:4px;">Visibilidad</label>
+        <select id="gStatus" style="width:100%;padding:10px;background:var(--fs-bg);border:1px solid var(--fs-border);border-radius:8px;color:var(--fs-text);font-size:0.85rem;box-sizing:border-box;">
+          <option value="private">🔒 Privada — solo búsqueda por cara</option>
+          <option value="active">🌐 Pública — todos pueden ver y comprar</option>
+          <option value="inactive">🚫 Inactiva — oculta</option>
+        </select>
+      </div>
+
+      <div style="border:1px solid var(--fs-border);border-radius:8px;padding:12px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+          <label style="font-size:0.75rem;font-weight:700;color:var(--fs-muted);">Descuentos por cantidad</label>
+          <button onclick="gAddDiscount()" type="button" style="padding:3px 10px;background:transparent;border:1px solid var(--fs-border);border-radius:6px;color:var(--fs-text);cursor:pointer;font-size:0.8rem;">+ Agregar</button>
+        </div>
+        <div id="gDiscountList"></div>
+        <div style="font-size:0.7rem;color:var(--fs-muted);margin-top:4px;">Ej: 3 fotos → 10% dto, 5 fotos → 20% dto</div>
+      </div>
+
+    </div>
+
+    <button class="btn-neon" onclick="createGallery()" style="margin-top:16px;width:100%;">Crear galería</button>
+    <button class="modal-close-btn" onclick="closeNewGalleryModal()">Cancelar</button>
   </div>
 </div>
 
@@ -682,9 +774,162 @@ function showToast(msg, type) {
   setTimeout(() => t.classList.remove('show'), 2500);
 }
 
+// ── Tabs ─────────────────────────────────────────────────────────────────────
+function switchTab(tab) {
+  document.getElementById('panelFotos').style.display = tab === 'fotos' ? '' : 'none';
+  document.getElementById('panelGalerias').style.display = tab === 'galerias' ? '' : 'none';
+  document.getElementById('tabFotos').style.borderBottomColor = tab === 'fotos' ? 'var(--fs-green)' : 'transparent';
+  document.getElementById('tabFotos').style.color = tab === 'fotos' ? 'var(--fs-green)' : 'var(--fs-muted)';
+  document.getElementById('tabGalerias').style.borderBottomColor = tab === 'galerias' ? 'var(--fs-green)' : 'transparent';
+  document.getElementById('tabGalerias').style.color = tab === 'galerias' ? 'var(--fs-green)' : 'var(--fs-muted)';
+  if (tab === 'galerias') loadGalleries();
+}
+
+// ── Galerías ──────────────────────────────────────────────────────────────────
+async function loadGalleries() {
+  const el = document.getElementById('galleriesList');
+  el.innerHTML = '<div style="color:var(--fs-muted);font-size:0.85rem;text-align:center;padding:24px;">Cargando...</div>';
+  try {
+    const data = await fetch('/api/cloud/galleries').then(r => r.json());
+    if (data.error) { el.innerHTML = `<div style="color:#f87171;font-size:0.85rem;text-align:center;padding:24px;">${data.error}</div>`; return; }
+    if (!data.length) { el.innerHTML = '<div style="color:var(--fs-muted);font-size:0.85rem;text-align:center;padding:24px;">No tenés galerías aún. ¡Creá una!</div>'; return; }
+    el.innerHTML = data.map(g => `
+      <div style="background:var(--fs-bg-card);border:1px solid var(--fs-border);border-radius:10px;padding:12px 14px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">
+        <div>
+          <div style="font-weight:700;font-size:0.88rem;">${g.name}</div>
+          <div style="font-size:0.72rem;color:var(--fs-muted);margin-top:2px;">${g.photo_count || 0} fotos · $${g.price_per_photo || 0} · <span style="color:${g.status==='active'?'#ADFF2F':'#666'}">${g.status}</span></div>
+        </div>
+        <div style="font-size:0.72rem;color:var(--fs-muted);">${g.event_date ? g.event_date.slice(0,10) : ''}</div>
+      </div>`).join('');
+  } catch { el.innerHTML = '<div style="color:#f87171;font-size:0.85rem;text-align:center;padding:24px;">Error al cargar galerías</div>'; }
+}
+
+let gDiscountRules = [];
+
+function openNewGalleryModal() {
+  gDiscountRules = [];
+  ['gName','gDesc','gLocation','gDate'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('gPrice').value = '1500';
+  document.getElementById('gStatus').value = 'private';
+  renderGDiscounts();
+  document.getElementById('newGalleryModal').style.display = 'flex';
+}
+function closeNewGalleryModal() { document.getElementById('newGalleryModal').style.display = 'none'; }
+
+function gAddDiscount() {
+  gDiscountRules.push({ min_photos: 3, discount_percent: 10 });
+  renderGDiscounts();
+}
+function gRemoveDiscount(i) { gDiscountRules.splice(i, 1); renderGDiscounts(); }
+function renderGDiscounts() {
+  document.getElementById('gDiscountList').innerHTML = gDiscountRules.map((r, i) => `
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;">
+      <input type="number" value="${r.min_photos}" min="1" placeholder="Fotos" onchange="gDiscountRules[${i}].min_photos=+this.value"
+        style="flex:1;padding:7px;background:var(--fs-bg);border:1px solid var(--fs-border);border-radius:6px;color:var(--fs-text);font-size:0.85rem;">
+      <span style="color:var(--fs-muted);font-size:0.8rem;">fotos →</span>
+      <input type="number" value="${r.discount_percent}" min="1" max="100" placeholder="%" onchange="gDiscountRules[${i}].discount_percent=+this.value"
+        style="flex:1;padding:7px;background:var(--fs-bg);border:1px solid var(--fs-border);border-radius:6px;color:var(--fs-text);font-size:0.85rem;">
+      <span style="color:var(--fs-muted);font-size:0.8rem;">%</span>
+      <button onclick="gRemoveDiscount(${i})" type="button" style="padding:4px 8px;background:transparent;border:1px solid #f87171;border-radius:6px;color:#f87171;cursor:pointer;font-size:0.8rem;">✕</button>
+    </div>`).join('');
+}
+
+async function createGallery() {
+  const name = document.getElementById('gName').value.trim();
+  if (!name) { showToast('El nombre es obligatorio', 'error'); return; }
+  const body = {
+    name,
+    description: document.getElementById('gDesc').value.trim() || null,
+    location: document.getElementById('gLocation').value.trim() || null,
+    event_date: document.getElementById('gDate').value || null,
+    price_per_photo: parseFloat(document.getElementById('gPrice').value) || 0,
+    status: document.getElementById('gStatus').value,
+    discount_rules: gDiscountRules,
+  };
+  try {
+    const res = await fetch('/api/cloud/galleries', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    const data = await res.json();
+    if (res.ok) {
+      showToast('✅ Galería creada', 'success');
+      closeNewGalleryModal();
+      loadGalleries();
+    } else {
+      showToast('❌ ' + (data.detail || data.error || 'Error'), 'error');
+    }
+  } catch { showToast('❌ Error de red', 'error'); }
+}
+
+// ── Auth ─────────────────────────────────────────────────────────────────────
+let authMenuOpen = false;
+
+async function checkAuthStatus() {
+  try {
+    const data = await fetch('/api/auth/status').then(r => r.json());
+    const dot = document.getElementById('authDot');
+    const label = document.getElementById('authLabel');
+    if (data.connected) {
+      dot.style.background = '#ADFF2F';
+      label.textContent = data.name.split(' ')[0];
+    } else {
+      dot.style.background = '#666';
+      label.textContent = 'Conectar';
+    }
+    return data;
+  } catch { return { connected: false }; }
+}
+
+function toggleAuthMenu() {
+  authMenuOpen = !authMenuOpen;
+  const menu = document.getElementById('authMenu');
+  menu.style.display = authMenuOpen ? 'block' : 'none';
+  if (authMenuOpen) renderAuthMenu();
+}
+
+document.addEventListener('click', e => {
+  if (!document.getElementById('authBadge').contains(e.target) &&
+      !document.getElementById('authMenu').contains(e.target)) {
+    authMenuOpen = false;
+    document.getElementById('authMenu').style.display = 'none';
+  }
+});
+
+async function renderAuthMenu() {
+  const data = await fetch('/api/auth/status').then(r => r.json());
+  const el = document.getElementById('authMenuContent');
+  if (data.connected) {
+    el.innerHTML = `
+      <div style="font-size:0.75rem;color:var(--fs-muted);margin-bottom:8px;">Conectado como</div>
+      <div style="font-weight:700;color:var(--fs-green);margin-bottom:12px;">${data.name}</div>
+      <button onclick="authLogout()" style="width:100%;padding:8px;background:transparent;border:1px solid #f87171;color:#f87171;border-radius:6px;cursor:pointer;font-size:0.82rem;font-weight:600;">Desconectar</button>`;
+  } else {
+    el.innerHTML = `
+      <div style="font-size:0.78rem;color:var(--fs-muted);margin-bottom:12px;">Conectá tu cuenta de<br><strong style="color:#e2e8f0;">fotoshow.online</strong> para subir fotos a la nube.</div>
+      <button onclick="authLogin()" style="width:100%;padding:9px;background:var(--fs-green);color:#0a0a0a;border:none;border-radius:6px;cursor:pointer;font-size:0.85rem;font-weight:700;">Conectar con Google</button>`;
+  }
+}
+
+function authLogin() {
+  const popup = window.open('https://fotoshow.online/api/auth/google/printserver', 'auth', 'width=500,height=600,left=200,top=100');
+  window.addEventListener('message', async e => {
+    if (e.data?.type === 'auth-success') {
+      await checkAuthStatus();
+      toggleAuthMenu();
+      showToast('✅ Conectado como ' + e.data.name, 'success');
+    }
+  }, { once: true });
+}
+
+async function authLogout() {
+  await fetch('/api/auth/logout', { method: 'POST' });
+  await checkAuthStatus();
+  toggleAuthMenu();
+  showToast('Desconectado', '');
+}
+
 // ── Init ─────────────────────────────────────────────────────────────────────
 loadPhotos();
 updateCameraStatus();
+checkAuthStatus();
 setInterval(loadPhotos, 30000);
 setInterval(updateCameraStatus, 8000);
 </script>
